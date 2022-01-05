@@ -1,6 +1,19 @@
-# rfilerunner Runner
+# rfilerunner
 
-Like a Makefile for simple scripts. This installs an `z` executable into your PATH that reads from an rfile, which is a YAML file that runs commands in some interpreter (shell, Python).
+rfilerunner is a simple command runner, similar to [`just`](https://github.com/casey/just) or a simple Makefile.
+This installs an `r` executable into your PATH that reads from an rfile, which is a YAML file that runs commands in some interpreter (e.g. shell, Python).
+
+```bash
+$ pip install rfilerunner
+
+$ echo '
+something: |
+  echo something
+' > rfile.yml
+
+$ r
+something
+```
 
 ## Installation
 
