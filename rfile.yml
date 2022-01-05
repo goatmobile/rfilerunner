@@ -1,0 +1,11 @@
+precommit: |
+  # parallel
+  # dep: test
+  # dep: black
+
+test: |
+  # arg: py (unittest args)
+  python tests/test.py $PY
+
+black: |
+  black .

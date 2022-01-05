@@ -1,0 +1,16 @@
+test1: |
+  # some help text
+  echo hi
+
+test2222: |
+  # shell: bash (some help text)
+  echo hi
+
+test13: |
+  # help: some help text
+  echo hi
+
+tt4: |
+  # ooooko
+  # arg: something (does something)
+  echo arg is: $SOMETHING

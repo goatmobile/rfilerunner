@@ -1,0 +1,35 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: Install rfilerunner and dependencies
+        run: |
+          set -eux
+          pip install -e .
+      - name: Run tests
+        run: |
+          set -eux
+          r test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+      - name: Install rfilerunner and dependencies
+        run: |
+          set -eux
+          pip install -e .
+          pip install black
+      - name: Run black
+        run: |
+          set -eux
+          black . --check
