@@ -116,5 +116,18 @@ class TestBigger(RFileTestCase):
         self.assertEqual(lines[3], "")
 
 
+class TestWatch(RFileTestCase):
+    rfile = """
+    watch: |
+        # watch: echo test.txt
+        echo start
+        sleep 5
+        echo done
+    """
+
+    def test_cancel(self):
+        pass
+
+
 if __name__ == "__main__":
     unittest.main()

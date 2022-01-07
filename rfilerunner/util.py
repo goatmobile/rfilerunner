@@ -1,12 +1,16 @@
 import subprocess
 import sys
 import json
+import asyncio
+import os
+import multiprocessing
 from typing import Any
 
 VERBOSE = False
 from rfilerunner.colors import Colors, color
 
 
+NPROC = multiprocessing.cpu_count()
 c = Colors
 usable_colors = [c.BLUE, c.PURPLE, c.GREEN, c.YELLOW, c.LIGHT_RED, c.LIGHT_GREEN]
 
@@ -18,7 +22,7 @@ def cmd(s, **kwargs):
 
 def error(error_message, code=1):
     print(f"{color('User error:', Colors.RED)} {error_message}", file=sys.stderr)
-    exit(code)
+    os._exit(code)
 
 
 def verbose(message):
@@ -50,6 +54,16 @@ def padding_from_run(name, run_info):
         padding = run_info["padding"] - len(name)
 
     return " " * padding
+
+
+async def ngather(tasks, n=NPROC - 1):
+    semaphore = asyncio.Semaphore(n)
+
+    async def sem_task(task):
+        async with semaphore:
+            return await task
+
+    return await asyncio.gather(*(sem_task(task) for task in tasks))
 
 
 def jprint(o):

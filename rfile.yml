@@ -4,8 +4,28 @@ precommit: |
   # dep: black
 
 test: |
+  # watch: pfiles
   # arg: py (unittest args)
   python tests/test.py $PY
 
+pfiles: |
+  find -type f -name "*.py"
+
 black: |
+  # watch: pfiles
   black .
+
+cfail: |
+  echo wow
+
+fail: |
+  # watch: 1
+  # catch: cfail
+  echo running
+  exit 1
+
+long: |
+  # watch: echo test.txt
+  echo hi
+  sleep 30
+  echo done

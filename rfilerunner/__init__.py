@@ -3,6 +3,8 @@ import os
 import textwrap
 import argparse
 import yaml
+import asyncio
+import signal
 
 from pathlib import Path
 from typing import Any
@@ -96,6 +98,13 @@ def show_subcommand_help(command, options):
         )
     print(f"{preamble}\n\n    {params.help}{args_desc}")
     exit(0)
+
+
+def signal_handler(signal, frame):
+    os._exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def locate_rfile(help: bool) -> str:
@@ -323,5 +332,7 @@ def cli():
         if value is not None:
             runtime_args[name] = value
 
-    code, stdout = run(params, runtime_args, commands, cwd=rfile.parent, run_info=None)
+    code, stdout = asyncio.run(
+        run(params, runtime_args, commands, cwd=rfile.parent, run_info=None)
+    )
     exit(code)

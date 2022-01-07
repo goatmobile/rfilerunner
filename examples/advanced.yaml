@@ -1,16 +1,58 @@
-test1: |
-  # some help text
-  echo hi
+go: |
+  echo hello
 
-test2222: |
-  # shell: bash (some help text)
-  echo hi
+go2: |
+  echo wow
+  exit 1
 
-test13: |
-  # help: some help text
-  echo hi
+go3: |
+  # parallel
+  # dep: go2
+  # dep: go
+  echo go3
 
-tt4: |
-  # ooooko
-  # arg: something (does something)
-  echo arg is: $SOMETHING
+realscript: |
+  if [ -z $OK ]; then
+      echo OK not set
+  else
+      echo OK is set
+  fi
+
+something: |
+  # a custom help
+  # arg: myarg (a description of myarg)
+  echo $MYARG
+  echo $myarg
+
+python: |
+  # shell: python
+  # arg: pyarg (a python arg)
+  print(args)
+  print(json)
+  print("neat")
+
+ticka: |
+  echo start ticka
+  for (( ; ; ))
+  do
+    echo ticka1
+    echo ticka2
+    sleep 1
+  done
+  echo stop ticka
+
+tickb: |
+  echo start tickb
+  for (( ; ; ))
+  do
+    echo tickb1
+    echo tickb2
+    sleep 1
+  done
+  echo stop tickb
+
+alternate: |
+  # parallel
+  # dep: ticka
+  # dep: tickb
+  echo done

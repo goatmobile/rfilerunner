@@ -23,5 +23,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     packages=setuptools.find_packages(),
-    install_requires=["Click", "PyYAML", "watchdog"],
+    install_requires=["Click", "PyYAML", "watchdog", "aiofiles"],
 )
