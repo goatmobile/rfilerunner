@@ -62,6 +62,9 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
         args = [f_w.name] + list(args.values())
         verbose(f"  running {command}")
 
+        # print("EXEC", params.shell, args)
+        # print(params.code)
+        # print(run_info)
         proc = await asyncio.create_subprocess_exec(
             params.shell,
             *args,
@@ -71,7 +74,6 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
             stdout=stdout,
         )
 
-        run_id = None
         if run_info is not None and "procs" in run_info:
             # run_id = run_info["gen_id"]()
             run_info["procs"][run_info["name"]] = proc.pid
@@ -122,6 +124,8 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
                 if not output:
                     break
 
+                # print("out", output.decode())
+
                 if run_info == "not real":
                     print(output.decode(), end="")
                     sys.stdout.flush()
@@ -157,10 +161,9 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
 
         # print("wait for comm")
         aioout, aioerr = await proc.communicate()
-        # print("   comm done!")
 
-        if run_info is not None and "procs" in run_info:
-            del run_info["procs"][run_id]
+        # if run_info is not None and "procs" in run_info:
+        #     del run_info["procs"][run_id]
 
         if aioout is not None:
             print(f"Unexpected output after closing read pipe:\n{aioout}")

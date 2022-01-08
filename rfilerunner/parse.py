@@ -19,6 +19,7 @@ class Params(NamedTuple):
     deps: List[str]
     parallel: bool
     code: str
+    cancel_watch: bool
 
 
 def default_shell() -> Optional[str]:
@@ -78,6 +79,7 @@ def parse(name: str, code: str, is_default: bool) -> Params:
     help = None
     args = {}
     deps = []
+    cancel_watch = False
     parallel = False
     catch = None
     watch_target = None
@@ -99,6 +101,8 @@ def parse(name: str, code: str, is_default: bool) -> Params:
             watch_target = line[len("# watch:") :].strip()
         elif line.startswith("# catch:"):
             catch = line[len("# catch:") :].strip()
+        elif line.strip() == "# cancel":
+            cancel_watch = True
         elif help is None:
             help = line[len("# ") :]
 
@@ -140,4 +144,5 @@ def parse(name: str, code: str, is_default: bool) -> Params:
         watch=watch_target,
         catch=catch,
         code=full_code,
+        cancel_watch=cancel_watch,
     )
