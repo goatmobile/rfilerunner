@@ -27,5 +27,5 @@ fail: |
 long: |
   # watch: echo test.txt
   echo hi
-  sleep 30
+  sleep 5
   echo done

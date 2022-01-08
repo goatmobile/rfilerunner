@@ -3,6 +3,8 @@ import asyncio
 import threading
 import time
 import re
+import watchdog
+import watchdog.observers
 from typing import Dict, List, Optional, Tuple
 
 from pathlib import Path
@@ -110,8 +112,7 @@ async def run(
         return 0, ""
 
     if params.watch is not None:
-        import watchdog
-        import watchdog.observers
+
 
         async def catch(rc, stdout):
             pass
@@ -155,7 +156,7 @@ async def run(
         ran_once = False
 
         async def watch_run(event):
-            print("Watch run!")
+            # print("Watch run!")
             nonlocal ran_once
             # if not ran_once:
             #     ran_once = True
@@ -177,7 +178,7 @@ async def run(
             rc, stdout = await runners.shell(params, new_args, cwd, new_info)
             if rc != 0:
                 await catch(rc, stdout)
-            print("WATCH_)RUN IS OVER")
+            # print("WATCH_)RUN IS OVER")
 
         if params.watch in commands:
             dependency_params = commands[params.watch]
@@ -237,7 +238,7 @@ async def run(
         paths_str = " ".join([str(x) for x in paths_to_watch])
         if len(paths_str) > 100 and not VERBOSE:
             print(
-                f"{color('[watching]', Colors.YELLOW)} {info_msg}watching   {len(paths_to_watch)} files"
+                f"{color('[watching]', Colors.YELLOW)} {info_msg}watching {len(paths_to_watch)} files"
             )
         else:
             print(
@@ -252,7 +253,7 @@ async def run(
         _procs[params.name] = None
 
         def worker(loop):
-            print("Working...")
+            # print("Working...")
             asyncio.set_event_loop(loop)
             loop.run_forever()
 
@@ -260,8 +261,8 @@ async def run(
         tl2 = asyncio.new_event_loop()
         tworker = threading.Thread(target=worker, args=(tl2,))
         tworker.start()
-        print(tl2)
-        print(asyncio.all_tasks(loop=tl2))
+        # print(tl2)
+        # print(asyncio.all_tasks(loop=tl2))
         last_handle = None
 
         class Handler(watchdog.events.FileSystemEventHandler):
@@ -276,52 +277,53 @@ async def run(
                     tloop = asyncio.new_event_loop()
                     asyncio.set_event_loop(tloop)
                 verbose(event)
-                print("--------------------------------")
-                print("last run:", _procs[params.name])
-                print("run in loop")
+                # print("--------------------------------")
+                # print("last run:", _procs[params.name])
+                # print("run in loop")
                 if _procs[params.name] is not None:
-                    print("KILLING LAST")
+                    # print("KILLING LAST")
                     try:
                         os.kill(_procs[params.name], signal.SIGTERM)
                     except ProcessLookupError:
-                        print("Failed to lookup pid", _procs[params.name])
+                        pass
+                        # print("Failed to lookup pid", _procs[params.name])
                 # tl2.create_task(watch_run(event))
                 # tl2.call_soon_threadsafe(watch_run(event))
                 # tl2.call_soon_threadsafe(watch_run, (event,))
                 last_handle = asyncio.run_coroutine_threadsafe(watch_run(event), tl2)
                 # print(asyncio.all_tasks(loop=tl2))
-                for t in asyncio.all_tasks(loop=tl2):
-                    print(t)
+                # for t in asyncio.all_tasks(loop=tl2):
+                #     print(t)
 
 
-                print("sent to loop")
+                # print("sent to loop")
 
-        class KillerHandler(watchdog.events.FileSystemEventHandler):
-            def on_any_event(self, event):
-                pass
-                # super().on_any_event(event)
-                # print("kill event", _procs)
-                # for pid in _procs.values():
-                #     if pid == _procs["last"]:
-                #         continue
-                #     print("killing", pid)
-                #     os.kill(pid, signal.SIGTERM)
-                # to_remove = list(_procs.keys())
-                # print("removing", to_remove)
-                # for k in to_remove:
-                #     if k == 'last':
-                #         continue
-                #     if pid == _procs["last"]:
-                #         continue
+        # class KillerHandler(watchdog.events.FileSystemEventHandler):
+        #     def on_any_event(self, event):
+        #         pass
+        #         # super().on_any_event(event)
+        #         # print("kill event", _procs)
+        #         # for pid in _procs.values():
+        #         #     if pid == _procs["last"]:
+        #         #         continue
+        #         #     print("killing", pid)
+        #         #     os.kill(pid, signal.SIGTERM)
+        #         # to_remove = list(_procs.keys())
+        #         # print("removing", to_remove)
+        #         # for k in to_remove:
+        #         #     if k == 'last':
+        #         #         continue
+        #         #     if pid == _procs["last"]:
+        #         #         continue
 
-                #     del _procs[k]
+        #         #     del _procs[k]
 
         event_handler = Handler()
-        event_handler2 = KillerHandler()
+        # event_handler2 = KillerHandler()
 
         for path in paths_to_watch:
             observer.schedule(event_handler, str(path.resolve()), recursive=False)
-            observer2.schedule(event_handler2, str(path.resolve()), recursive=False)
+            # observer2.schedule(event_handler2, str(path.resolve()), recursive=False)
 
         observer.start()
         # observer2.start()
@@ -330,10 +332,10 @@ async def run(
         # await watch_run(None)
 
         # This should loop forever
-        print("yielding...")
+        # print("yielding...")
         await aiojoin(observer)
         # await aiojoin(observer2)
-        print("done with everything")
+        # print("done with everything")
 
         return 0, None
     else:

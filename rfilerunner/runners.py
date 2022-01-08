@@ -110,12 +110,12 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
             # If run_info is set, the output needs be handled manually
             os.close(pty_w)
 
-            print("spin read")
+            # print("spin read")
             while True:
                 try:
-                    print('   waiting for read')
+                    # print('   waiting for read')
                     output = await aioread(pty_r)
-                    print('   read!')
+                    # print('   read!')
                 except OSError as e:
                     verbose(f"OSError: {e}")
                     break
@@ -155,9 +155,9 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
 
                             print(f"{line.rstrip()}")
 
-        print("wait for comm")
+        # print("wait for comm")
         aioout, aioerr = await proc.communicate()
-        print("   comm done!")
+        # print("   comm done!")
 
         if run_info is not None and "procs" in run_info:
             del run_info["procs"][run_id]
