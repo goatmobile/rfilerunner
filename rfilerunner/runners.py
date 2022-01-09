@@ -62,9 +62,10 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
         args = [f_w.name] + list(args.values())
         verbose(f"  running {command}")
 
-        # print("EXEC", params.shell, args)
+        # print("EXEC", params.shell, params.code.strip())
         # print(params.code)
         # print(run_info)
+
         proc = await asyncio.create_subprocess_exec(
             params.shell,
             *args,
@@ -126,7 +127,7 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
 
                 # print("out", output.decode())
 
-                if run_info == "not real":
+                if run_info == "not real" or single:
                     print(output.decode(), end="")
                     sys.stdout.flush()
                 else:

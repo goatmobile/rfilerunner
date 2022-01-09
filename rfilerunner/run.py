@@ -72,6 +72,44 @@ async def aiojoin(observer):
     return await loop.run_in_executor(None, observer_join, observer)
 
 
+def worker(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+
+class Handler(watchdog.events.FileSystemEventHandler):
+    def __init__(self, procs, params, watch_run):
+        self.last_handle = None
+        self.loop = asyncio.new_event_loop()
+        self.watch_run = watch_run
+        self.procs = procs
+        self.params = params
+
+        worker_thread = threading.Thread(target=worker, args=(self.loop,))
+        worker_thread.start()
+
+    def on_any_event(self, event):
+        if self.params.cancel_watch:
+
+            if self.last_handle is not None:
+                self.last_handle.cancel()
+
+            verbose(event)
+            print(event)
+
+            if self.procs[self.params.name] is not None:
+                try:
+                    os.kill(self.procs[self.params.name], signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+
+            self.last_handle = asyncio.run_coroutine_threadsafe(
+                self.watch_run(event), self.loop
+            )
+        else:
+            asyncio.run(self.watch_run(event))
+
+
 async def watch(
     params: Params,
     args: Dict[str, str],
@@ -205,55 +243,17 @@ async def watch(
 
     observer = watchdog.observers.Observer()
 
-    tloop = None
     _procs[params.name] = None
-
-    def worker(loop):
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
-
-    tl2 = asyncio.new_event_loop()
-    tworker = threading.Thread(target=worker, args=(tl2,))
-    tworker.start()
-    last_handle = None
-
-    class Handler(watchdog.events.FileSystemEventHandler):
-        def on_any_event(self, event):
-            if params.cancel_watch:
-                nonlocal last_handle
-
-                if last_handle is not None:
-                    last_handle.cancel()
-
-                nonlocal tloop
-                if tloop is None:
-                    tloop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(tloop)
-
-                verbose(event)
-                print(event)
-
-                if _procs[params.name] is not None:
-                    # print("KILLING LAST")
-                    try:
-                        os.kill(_procs[params.name], signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-            else:
-                asyncio.run(watch_run(event))
-
-            last_handle = asyncio.run_coroutine_threadsafe(watch_run(event), tl2)
-
-    event_handler = Handler()
+    handler = Handler(_procs, params, watch_run)
 
     for path in paths_to_watch:
-        observer.schedule(event_handler, str(path.resolve()), recursive=False)
+        observer.schedule(handler, str(path.resolve()), recursive=False)
 
     observer.start()
 
     # Run once to start
     if params.cancel_watch:
-        event_handler.on_any_event(None)
+        handler.on_any_event(None)
     else:
         await watch_run(None)
 
