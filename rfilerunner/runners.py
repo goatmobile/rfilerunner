@@ -5,10 +5,11 @@ import sys
 import textwrap
 import pty
 import asyncio
-import aiofiles
+from typing import Dict, Optional, List, Set
 
 from rfilerunner import util
 from rfilerunner import colors, Colors
+from rfilerunner.parse import Params
 from rfilerunner.util import verbose, padding_from_run, color_from_run
 
 c = Colors
@@ -27,61 +28,75 @@ async def aioread(f):
     return await loop.run_in_executor(None, read, f)
 
 
-async def run_in_interpreter(params, args, cwd, run_info, preamble):
+async def run_in_interpreter(
+    params: Params,
+    args: Dict[str, str],
+    cwd: str,
+    preamble: str,
+    running_pids: Optional[Set[int]] = None,
+    hide_output: bool = False,
+    padding: int = 0,
+    run_idx: Optional[int] = None,
+):
     verbose(f"Shell executing: {params}")
     env = os.environ.copy()
     for k, v in args.items():
         env[k.lower()] = v
         env[k.upper()] = v
 
-    recorded_stdout = None
-    record = run_info is not None and run_info.get("record_stdout", False)
-    hide_output = run_info is not None and run_info.get("hide_stdout", record)
-    single = True
-    if run_info is not None:
-        single = run_info.get("single", False)
-    if record:
-        recorded_stdout = ""
+    # record = run_info is not None and run_info.get("record_stdout", False)
+    record = True
 
-    if run_info is None:
-        run_info = "not real"
+    # hide_output = run_info is not None and run_info.get("hide_stdout", record)
+    single = run_idx is None
+    # if run_info is not None:
+    #     single = run_info.get("single", False)
+    # if record:
+    recorded_stdout = ""
+
+    # if run_info is None:
+    #     run_info = "not real"
 
     with tempfile.NamedTemporaryFile(delete=False) as f:
         with open(f.name, "w") as f_w:
             f_w.write(preamble)
             f_w.write(params.code)
 
-        stderr = None
-        stdout = None
-        if run_info is not None:
-            pty_r, pty_w = pty.openpty()
-            stderr = pty_w
-            stdout = pty_w
+        # stderr = None
+        # stdout = None
+        # if run_info is not None:
+        pty_r, pty_w = pty.openpty()
+        stderr = pty_w
+        stdout = pty_w
 
         command = [params.shell, f_w.name] + list(args.values())
-        args = [f_w.name] + list(args.values())
+        command_args = [f_w.name] + list(args.values())
         verbose(f"  running {command}")
 
         # print("EXEC", params.shell, params.code.strip())
         # print(params.code)
         # print(run_info)
-
+        # print(params.shell)
         proc = await asyncio.create_subprocess_exec(
             params.shell,
-            *args,
+            *command_args,
             cwd=cwd,
             env=env,
             stderr=stderr,
             stdout=stdout,
         )
 
-        if run_info is not None and "procs" in run_info:
-            # run_id = run_info["gen_id"]()
-            run_info["procs"][run_info["name"]] = proc.pid
+        # if run_info is not None and "procs" in run_info:
+        #     # run_id = run_info["gen_id"]()
+        #     run_info["procs"][run_info["name"]] = proc.pid
+        if running_pids is not None:
+            running_pids.add(proc.pid)
 
-        padding = padding_from_run(params.name, run_info)
-        color = color_from_run(run_info)
-        line_started = False
+        padding = " " * padding
+        color = ""
+        if run_idx is not None:
+            color = util.usable_colors[run_idx % len(util.usable_colors)]
+        # line_started = False
 
         class Printer:
             def __init__(self, prefix):
@@ -105,66 +120,45 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
             def prefix(self):
                 print(self._prefix, end="")
 
-        if run_info is not None:
-            if single:
-                p = Printer(f"")
-            else:
-                p = Printer(f"{color}{params.name}{c.END}{padding} | ")
-            # If run_info is set, the output needs be handled manually
-            os.close(pty_w)
+        # if single:
+        #     p = Printer(f"")
+        # else:
+        #     p = Printer(f"{color}{params.name}{c.END}{padding} | ")
+        # If run_info is set, the output needs be handled manually
+        os.close(pty_w)
 
-            # print("spin read")
-            while True:
-                try:
-                    # print('   waiting for read')
-                    output = await aioread(pty_r)
-                    # print('   read!')
-                except OSError as e:
-                    verbose(f"OSError: {e}")
-                    break
-                if not output:
-                    break
+        # print("spin read")
+        while True:
+            try:
+                # print('   waiting for read')
+                output = await aioread(pty_r)
+                # print('   read!')
+            except OSError as e:
+                verbose(f"OSError: {e}")
+                break
+            if not output:
+                # subprocess closed stdout / stderr
+                break
 
-                # print("out", output.decode())
+            # print("out", output.decode())
 
-                if run_info == "not real" or single:
-                    print(output.decode(), end="")
-                    sys.stdout.flush()
+            output = output.decode()
+            if not hide_output:
+                if single:
+                    print(output, end="")
                 else:
-                    output = output.decode()
-
-                    # # print("OUTPUT", output.encode())
-                    # if output.endswith("\n"):
-                    #     # a line (or series of lines)
-                    #     lines = output.rstrip().split("\n")
-                    #     for line in lines:
-                    #         p.line(line)
-                    # else:
-                    #     p.partial(output)
-
-                    # print(f"OUT[{output}]")
-                    # output = output.decode().rstrip()
                     lines = output.split("\n")
                     end = len(lines)
                     if output.endswith("\n"):
                         end = end - 1
                     for line in lines[:end]:
-                        if record:
-                            recorded_stdout += line.rstrip() + "\n"
+                        # recorded_stdout += line.rstrip() + "\n"
+                        print(f"{color}{params.name}{c.END}{padding} | {line.rstrip()}")
+                        # print(f"{line.rstrip()}")
 
-                        if not hide_output:
-                            if not single:
-                                print(
-                                    f"{color}{params.name}{c.END}{padding} | ", end=""
-                                )
-
-                            print(f"{line.rstrip()}")
-
-        # print("wait for comm")
+            recorded_stdout += output
+            sys.stdout.flush()
         aioout, aioerr = await proc.communicate()
-
-        # if run_info is not None and "procs" in run_info:
-        #     del run_info["procs"][run_id]
 
         if aioout is not None:
             print(f"Unexpected output after closing read pipe:\n{aioout}")
@@ -175,7 +169,7 @@ async def run_in_interpreter(params, args, cwd, run_info, preamble):
         return proc.returncode, recorded_stdout
 
 
-def python(params, args, cwd, run_info):
+def python(params, args, cwd, **kwargs):
     arg_data = {}
     for name in params.args:
         arg_data[name] = None
@@ -203,16 +197,15 @@ def python(params, args, cwd, run_info):
     args = dotdict({data})
     """
     )
-    return run_in_interpreter(params, args, cwd, run_info, preamble)
+    return run_in_interpreter(params, args, cwd, preamble=preamble, **kwargs)
 
 
-def shell(params, args, cwd, run_info):
+def shell(params, args, cwd, **kwargs):
     preamble = "set -e\n"
     if util.VERBOSE:
         preamble = "set -ex\n"
-    return run_in_interpreter(params, args, cwd, run_info, preamble)
+    return run_in_interpreter(params, args, cwd, preamble=preamble, **kwargs)
 
 
-def generic(params, args, cwd, run_info):
-    preamble = ""
-    return run_in_interpreter(params, args, cwd, run_info, preamble)
+def generic(params, args, cwd, **kwargs):
+    return run_in_interpreter(params, args, cwd, preamble="", **kwargs)

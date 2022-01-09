@@ -1,4 +1,5 @@
 import unittest
+import time
 import subprocess
 import textwrap
 import tempfile
@@ -8,8 +9,16 @@ from typing import List, Dict, Optional
 
 
 class RFileTestCase(unittest.TestCase):
-    def zrun(self, args: List[str], env: Optional[Dict[str, str]] = None):
-        content = textwrap.dedent(self.rfile)
+    def exec(
+        self,
+        fn,
+        args: List[str],
+        env: Optional[Dict[str, str]] = None,
+        content: str = None,
+    ):
+        if content is None:
+            content = textwrap.dedent(self.rfile)
+
         with tempfile.NamedTemporaryFile(delete=False) as f:
             with open(f.name, "w") as f_w:
                 f_w.write(content)
@@ -19,13 +28,41 @@ class RFileTestCase(unittest.TestCase):
                 os_env.update(env)
                 env = os_env
 
-            proc = subprocess.run(
+            proc = fn(
                 ["r", "-r", f.name] + args,
                 stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 encoding="utf-8",
                 env=env,
             )
-            return proc.stdout
+            return proc
+
+    def zrun(self, *args, **kwargs):
+        proc = self.exec(subprocess.run, *args, **kwargs)
+        return proc.stdout
+
+    def ropen(self, *args, **kwargs):
+        proc = self.exec(subprocess.Popen, *args, **kwargs)
+        return proc
+
+    def run_for(
+        self,
+        seconds: int,
+        args: List[str],
+        env: Optional[Dict[str, str]] = None,
+        content: str = None,
+        action=None,
+    ):
+        proc = self.ropen(args, env, content)
+        if action is not None:
+            action()
+        try:
+            proc.communicate(timeout=seconds)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+        out, err = proc.communicate()
+        return out, err
 
 
 class TestBasic(RFileTestCase):
@@ -116,17 +153,72 @@ class TestBigger(RFileTestCase):
         self.assertEqual(lines[3], "")
 
 
+def wrap_with_temp(fn):
+    def wrapped(self):
+        with tempfile.NamedTemporaryFile() as f:
+            return fn(self, self.rfile_template.format(file=f.name), f.name)
+
+    return wrapped
+
+
 class TestWatch(RFileTestCase):
-    rfile = """
+    rfile_template = """
     watch: |
-        # watch: echo test.txt
+        # watch: echo {file}
         echo start
-        sleep 5
+        sleep 3
         echo done
+
+    watch2: |
+        # watch: files
+        echo watchin $CHANGED
+    
+    files: |
+        echo {file}
     """
 
-    def test_cancel(self):
-        pass
+    @wrap_with_temp
+    def test_run(self, rfile, fname):
+        out, err = self.run_for(1, [], content=rfile)
+        self.assertEqual("", err.strip())
+        self.assertEqual(f"[watching] {fname}\nstart", out.strip())
+
+    @wrap_with_temp
+    def test_multirun(self, rfile, fname):
+        out, err = self.run_for(5, [], content=rfile)
+        self.assertEqual("", err.strip())
+        self.assertEqual(f"[watching] {fname}\nstart\ndone", out.strip())
+
+    def test_files_exist(self):
+        out, err = self.run_for(
+            1, ["watch2"], content=self.rfile_template.format(file="nonexistent.txt")
+        )
+        self.assertEqual(
+            "User error: Some paths to watch didn't exist: nonexistent.txt", err.strip()
+        )
+
+    @wrap_with_temp
+    def test_watch_command(self, rfile, fname):
+        out, err = self.run_for(1, ["watch2"], content=rfile)
+        self.assertEqual("", err.strip())
+        self.assertEqual(f"[watching] {fname}\nwatchin", out.strip())
+
+    @wrap_with_temp
+    def test_watch_write(self, rfile, fname):
+        def edit():
+            time.sleep(1)
+            with open(fname, "w") as f:
+                f.write("hello")
+            time.sleep(1)
+            with open(fname, "w") as f:
+                f.write("hello2")
+
+        out, err = self.run_for(1, ["watch2"], content=rfile, action=edit)
+        self.assertEqual("", err.strip())
+        self.assertEqual(
+            f"[watching] {fname}\nwatchin\nwatchin {fname}\nwatchin {fname}",
+            out.strip(),
+        )
 
 
 if __name__ == "__main__":

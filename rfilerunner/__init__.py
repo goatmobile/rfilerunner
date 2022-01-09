@@ -332,7 +332,5 @@ def cli():
         if value is not None:
             runtime_args[name] = value
 
-    code, stdout = asyncio.run(
-        run(params, runtime_args, commands, cwd=rfile.parent, run_info=None)
-    )
+    code, stdout = asyncio.run(run(params, runtime_args, commands, cwd=rfile.parent))
     exit(code)

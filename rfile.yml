@@ -29,3 +29,9 @@ long: |
   echo hi
   sleep 5
   echo done
+
+watch: |
+  # watch: echo test.txt
+  echo start
+  sleep 3
+  echo done

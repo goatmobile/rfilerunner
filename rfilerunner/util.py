@@ -4,7 +4,7 @@ import json
 import asyncio
 import os
 import multiprocessing
-from typing import Any
+from typing import Any, Optional
 
 VERBOSE = False
 from rfilerunner.colors import Colors, color
@@ -41,11 +41,15 @@ def internal_assert(cond, message):
         error("If you're seeing this, this is an rfile bug")
 
 
-def color_from_run(run_info):
-    color = ""
-    if run_info is not None and "index" in run_info:
-        color = usable_colors[run_info["index"] % len(usable_colors)]
-    return color
+def color_from_run(run_idx: Optional[int]) -> str:
+    if run_idx is None:
+        return ""
+
+    return usable_colors[run_idx % len(usable_colors)]
+    # color = ""
+    # if run_info is not None and "index" in run_info:
+    #     color = usable_colors[run_info["index"] % len(usable_colors)]
+    # return color
 
 
 def padding_from_run(name, run_info):

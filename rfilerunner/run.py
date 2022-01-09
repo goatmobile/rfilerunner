@@ -115,7 +115,8 @@ async def watch(
     args: Dict[str, str],
     commands: Dict[str, Params],
     cwd: str,
-    run_info: Dict[str, str],
+    padding: int,
+    run_idx: Optional[int],
 ):
     async def catch(rc, stdout):
         pass
@@ -133,7 +134,7 @@ async def watch(
                     new_args,
                     commands,
                     cwd,
-                    run_info=None,
+                    # run_info=None,
                 )
 
         else:
@@ -163,16 +164,23 @@ async def watch(
         if event is not None:
             new_args["CHANGED"] = event.src_path
 
-        if run_info is None:
-            new_info = {}
-        else:
-            new_info = run_info.copy()
-        new_info["record_stdout"] = True
-        new_info["hide_stdout"] = False
-        new_info["single"] = run_info is None
-        new_info["procs"] = _procs
-        new_info["name"] = params.name
-        rc, stdout = await runners.shell(params, new_args, cwd, new_info)
+        # if run_info is None:
+        #     new_info = {}
+        # else:
+        #     new_info = run_info.copy()
+        # new_info["record_stdout"] = True
+        # new_info["hide_stdout"] = False
+        # new_info["single"] = run_info is None
+        # new_info["procs"] = _procs
+        # new_info["name"] = params.name
+        rc, stdout = await runners.shell(
+            params,
+            new_args,
+            cwd,
+            padding=padding,
+            run_idx=run_idx,
+            running_pids=_procs[params.name],
+        )
         if rc != 0:
             await catch(rc, stdout)
         # print("WATCH_)RUN IS OVER")
@@ -184,13 +192,15 @@ async def watch(
             args,
             commands,
             cwd,
-            run_info={"record_stdout": True},
+            padding=padding,
+            run_idx=run_idx,
+            hide_output=True,
         )
-    elif isfloat(params.watch):
-        sleep_time = float(params.watch)
-        while True:
-            await watch_run(None)
-            time.sleep(sleep_time)
+    # elif isfloat(params.watch):
+    #     sleep_time = float(params.watch)
+    #     while True:
+    #         await watch_run(None)
+    #         time.sleep(sleep_time)
     else:
         new_args = params.args.copy()
         new_args["CHANGED"] = ""
@@ -207,9 +217,7 @@ async def watch(
             code=run_code,
             cancel_watch=False,
         )
-        rc, stdout = await runners.shell(
-            run_params, new_args, cwd, run_info={"record_stdout": True}
-        )
+        rc, stdout = await runners.shell(run_params, new_args, cwd, hide_output=True)
         if rc != 0:
             error(f"watch command failed: {run_code.strip()}\n{stdout.rstrip()}")
             return rc, None
@@ -221,13 +229,13 @@ async def watch(
         non_existent = ", ".join([str(x) for x in non_existent])
         error(f"Some paths to watch didn't exist: {non_existent}")
 
-    if run_info is None:
+    if run_idx is None:
         # no prefix if this isn't run alongside other commands
         info_msg = ""
     else:
         # prepend with: "<name> |"
         info_msg = color(
-            f"{color_from_run(run_info)}{params.name}{Colors.END}{padding_from_run(params.name, run_info)} | ",
+            f"{color_from_run(run_idx)}{params.name}{Colors.END}{' ' * padding} | ",
             Colors.YELLOW,
         )
 
@@ -268,7 +276,9 @@ async def run(
     args: Dict[str, str],
     commands: Dict[str, Params],
     cwd: str,
-    run_info: Dict[str, str],
+    padding: int = 0,
+    run_idx: Optional[int] = None,
+    hide_output: bool = False,
 ) -> Tuple[int, str]:
     """
     Execute an rfile command and any transitive dependencies.
@@ -276,29 +286,35 @@ async def run(
     verbose(f"Running command {params.name}, {params}")
 
     # Run dependencies
-    if params.parallel and len(params.deps) > 0:
-        # Need to run in parallel, so determine padding info to pass down to
-        # each subprocess
+    if len(params.deps) > 0:
+        # Actual invocations don't know about the others, so compute the padding
+        # for each output line and pass it down
         padding = max(len(p) for p in params.deps)
-        if run_info is not None:
-            raise RuntimeError("Nested parallel runs aren't supported")
 
-        coros = []
-        for i, dep in enumerate(params.deps):
-            run_info = {
-                "padding": padding,
-                "index": i,
-            }
+        for dep in params.deps:
             if dep not in commands:
                 error(
                     f"'{dep}' command not found in rfile but was specified as a dependency of '{params.name}'"
                 )
-            coros.append(run(commands[dep], args, commands, cwd, run_info))
 
-        await ngather(coros)
-    else:
-        for dep in params.deps:
-            await run(commands[dep], args, commands, cwd, run_info=None)
+        dependency_runs = [
+            run(
+                commands[dep],
+                args,
+                commands,
+                cwd,
+                padding=padding,
+                run_idx=i,
+                hide_output=hide_output,
+            )
+            for i, dep in enumerate(params.deps)
+        ]
+
+        if params.parallel:
+            await ngather(dependency_runs)
+        else:
+            for c in dependency_runs:
+                await c
 
     if params.code.strip() == "":
         # No actual code (but can't do this any earlier in case there are dependencies)
@@ -307,7 +323,7 @@ async def run(
     if params.watch is not None:
         # This shouldn't ever actually return, just spin forever watching the
         # specified files
-        return await watch(params, args, commands, cwd, run_info)
+        return await watch(params, args, commands, cwd, padding, run_idx)
     else:
         # Normal run, determine the runner based on params.shell
         runner = runners.generic
@@ -317,5 +333,7 @@ async def run(
             runner = runners.python
 
         # Execute code
-        rc, stdout = await runner(params, args, cwd, run_info)
+        rc, stdout = await runner(
+            params, args, cwd, padding=padding, run_idx=run_idx, hide_output=hide_output
+        )
         return rc, stdout
