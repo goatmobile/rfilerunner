@@ -75,6 +75,8 @@ def parse(name: str, code: str, is_default: bool) -> Params:
             break
 
     code = lines[index:]
+
+    # Set these all to defaults, figure them out if present in parsing
     shell = default_shell()
     help = None
     args = {}
@@ -83,6 +85,7 @@ def parse(name: str, code: str, is_default: bool) -> Params:
     parallel = False
     catch = None
     watch_target = None
+
     for line in preamble:
         if line.startswith("# shell: "):
             shell_path, help = parse_name_and_help(line[len("# shell: ") :])
@@ -106,6 +109,7 @@ def parse(name: str, code: str, is_default: bool) -> Params:
         elif help is None:
             help = line[len("# ") :]
 
+    # If this has no help but dependencies, infer a help based on the dependencies
     if help is None and len(deps) > 0:
         if len(deps) == 1:
             help = f"run {deps[0]}"
@@ -117,7 +121,8 @@ def parse(name: str, code: str, is_default: bool) -> Params:
     full_code = "\n".join(code)
 
     if help is None:
-        # put in some help text so it's not blank, just use the code
+        # If help is still blank, put in some help text so it's not blank,
+        # just use the code
         sample = full_code[:31].strip().replace("\n", "; ")
         if len(sample) == 31:
             sample = sample[:27] + "..."
@@ -125,16 +130,12 @@ def parse(name: str, code: str, is_default: bool) -> Params:
             sample = sample[:30]
         help = color(sample, Colors.FAINT)
 
+    # Label the first command
     if is_default:
         if help is None:
             help = "(default)"
         else:
             help += " (default)"
-
-    if catch is not None and watch_target is None:
-        print(
-            f"{Colors.BOLD}{Colors.RED}[r] '# catch' cannot be used without '# watch', but this was found in target '{name}'{Colors.END}"
-        )
 
     return Params(
         name=name,

@@ -38,33 +38,25 @@ async def run_in_interpreter(
     padding: int = 0,
     run_idx: Optional[int] = None,
 ):
+    """
+    Actually execute 'params'
+    """
     verbose(f"Shell executing: {params}")
     env = os.environ.copy()
     for k, v in args.items():
         env[k.lower()] = v
         env[k.upper()] = v
 
-    # record = run_info is not None and run_info.get("record_stdout", False)
-    record = True
-
-    # hide_output = run_info is not None and run_info.get("hide_stdout", record)
     single = run_idx is None
-    # if run_info is not None:
-    #     single = run_info.get("single", False)
-    # if record:
     recorded_stdout = ""
-
-    # if run_info is None:
-    #     run_info = "not real"
 
     with tempfile.NamedTemporaryFile(delete=False) as f:
         with open(f.name, "w") as f_w:
             f_w.write(preamble)
             f_w.write(params.code)
 
-        # stderr = None
-        # stdout = None
-        # if run_info is not None:
+        # Use a pseudo-terminal so subprocesses send color output (color codes
+        # will be stripped out later if necessary)
         pty_r, pty_w = pty.openpty()
         stderr = pty_w
         stdout = pty_w
@@ -73,10 +65,8 @@ async def run_in_interpreter(
         command_args = [f_w.name] + list(args.values())
         verbose(f"  running {command}")
 
+        # Calculate padding based on other runs
         padding = padding - len(params.name)
-        # print(params.code)
-        # print(run_info)
-        # print(params.shell)
         proc = await asyncio.create_subprocess_exec(
             params.shell,
             *command_args,
@@ -86,9 +76,8 @@ async def run_in_interpreter(
             stdout=stdout,
         )
 
-        # if run_info is not None and "procs" in run_info:
-        #     # run_id = run_info["gen_id"]()
-        #     run_info["procs"][run_info["name"]] = proc.pid
+        # Store the PID in case this needs to be terminated for a cancel by the
+        # file event listener
         if running_pids is not None:
             running_pids.add(proc.pid)
 
@@ -96,51 +85,19 @@ async def run_in_interpreter(
         color = ""
         if run_idx is not None:
             color = util.usable_colors[run_idx % len(util.usable_colors)]
-        # line_started = False
 
-        class Printer:
-            def __init__(self, prefix):
-                self.partial_line = False
-                self._prefix = prefix
-
-            def line(self, line):
-                if not self.partial_line:
-                    self.prefix()
-                print(line)
-                self.partial_line = False
-                sys.stdout.flush()
-
-            def partial(self, text):
-                if not self.partial_line:
-                    self.partial_line = True
-                    self.prefix()
-                print(text, end="")
-                sys.stdout.flush()
-
-            def prefix(self):
-                print(self._prefix, end="")
-
-        # if single:
-        #     p = Printer(f"")
-        # else:
-        #     p = Printer(f"{color}{params.name}{c.END}{padding} | ")
-        # If run_info is set, the output needs be handled manually
         os.close(pty_w)
 
-        # print("spin read")
+        # Read from the pty output until the process finishes
         while True:
             try:
-                # print('   waiting for read')
                 output = await aioread(pty_r)
-                # print('   read!')
             except OSError as e:
                 verbose(f"OSError: {e}")
                 break
             if not output:
                 # subprocess closed stdout / stderr
                 break
-
-            # print("out", output.decode())
 
             output = output.decode()
             if not hide_output:
@@ -152,17 +109,16 @@ async def run_in_interpreter(
                     if output.endswith("\n"):
                         end = end - 1
                     for line in lines[:end]:
-                        # recorded_stdout += line.rstrip() + "\n"
                         print(f"{color}{params.name}{c.END}{padding} | {line.rstrip()}")
-                        # print(f"{line.rstrip()}")
 
             recorded_stdout += output
             sys.stdout.flush()
+
         aioout, aioerr = await proc.communicate()
 
+        # All output should already have been read in the loop above
         if aioout is not None:
             print(f"Unexpected output after closing read pipe:\n{aioout}")
-
         if aioerr is not None:
             print(f"Unexpected output after closing read pipe:\n{aioerr}")
 
@@ -170,15 +126,17 @@ async def run_in_interpreter(
 
 
 def python(params, args, cwd, **kwargs):
+    # Build args to pass into Python as a dotdict (defined below)
     arg_data = {}
     for name in params.args:
         arg_data[name] = None
-
     for name, value in args.items():
         arg_data[name] = f'"{value}"'
 
     data = [f"{k}={v}" for k, v in arg_data.items()]
     data = ", ".join(data)
+
+    # Import some common stuff to avoid boilerplate in scripts
     preamble = textwrap.dedent(
         f"""
     import os
@@ -201,6 +159,7 @@ def python(params, args, cwd, **kwargs):
 
 
 def shell(params, args, cwd, **kwargs):
+    # It's a shell, so error out when a command fails via set -e
     preamble = "set -e\n"
     if util.VERBOSE:
         preamble = "set -ex\n"
@@ -208,4 +167,5 @@ def shell(params, args, cwd, **kwargs):
 
 
 def generic(params, args, cwd, **kwargs):
+    # Execution environment isn't known, so add nothing and just pass through
     return run_in_interpreter(params, args, cwd, preamble="", **kwargs)

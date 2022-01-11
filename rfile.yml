@@ -24,12 +24,17 @@ fail: |
   echo running
   exit 1
 
+longcatch: |
+  echo longcaught
+  sleep 10
+  echo done
+
 long: |
   # watch: echo test.txt
   # cancel
-  echo hi
-  sleep 5
-  echo done
+  # catch: echo catch; sleep 3; echo done
+  echo longrun
+  exit 1
 
 watch: |
   # watch: echo test.txt

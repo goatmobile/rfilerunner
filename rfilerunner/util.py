@@ -46,10 +46,6 @@ def color_from_run(run_idx: Optional[int]) -> str:
         return ""
 
     return usable_colors[run_idx % len(usable_colors)]
-    # color = ""
-    # if run_info is not None and "index" in run_info:
-    #     color = usable_colors[run_info["index"] % len(usable_colors)]
-    # return color
 
 
 def padding_from_run(name, run_info):

@@ -4,32 +4,26 @@ import threading
 import time
 import signal
 import re
-import watchdog
-import watchdog.observers
-from typing import Dict, List, Optional, Tuple
 
+from typing import Dict, List, Optional, Tuple
 from pathlib import Path
+
 from rfilerunner.colors import Colors, color
 from rfilerunner.util import (
     verbose,
-    padding_from_run,
     error,
-    color_from_run,
     ngather,
     VERBOSE,
 )
 from rfilerunner.parse import Params
 from rfilerunner import runners
 
+import watchdog
+import watchdog.observers
 
-_run_id = 0
+# List of running process IDs (used to terminate running processes from
+# another thread in the event of a watch cancel)
 _procs = {}
-
-
-def run_id():
-    global _run_id
-    _run_id += 1
-    return _run_id
 
 
 def strip_ansi(s: str) -> str:
@@ -68,11 +62,14 @@ def observer_join(observer):
 
 
 async def aiojoin(observer):
+    # Wrapper to join via asyncio
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, observer_join, observer)
 
 
 def worker(loop):
+    # Worker thread to execute an async loop (filled with tasks by a file
+    # listener)
     asyncio.set_event_loop(loop)
     loop.run_forever()
 
@@ -89,13 +86,18 @@ class Handler(watchdog.events.FileSystemEventHandler):
         worker_thread.start()
 
     def on_any_event(self, event):
+        # On a file change event, run the relevant script
         if self.params.cancel_watch:
 
+            # Terminate any async processes in the worker thread's loop
             if self.last_handle is not None:
                 self.last_handle.cancel()
 
             verbose(event)
 
+            # Stop any previous runs of this command if present (this gets
+            # filled out in runners.py when the process is actually run via
+            # subprocess)
             if self.procs[self.params.name] is not None:
                 try:
                     os.kill(self.procs[self.params.name], signal.SIGKILL)
@@ -118,6 +120,11 @@ async def watch(
     run_idx: Optional[int],
     watch_files: Optional[List[str]] = None,
 ):
+    """
+    Run a command via a watch. This loops infinitely based on 'params' (e.g.
+    based on files or a timer).
+    """
+
     async def catch(rc, stdout):
         pass
 
@@ -134,7 +141,6 @@ async def watch(
                     new_args,
                     commands,
                     cwd,
-                    # run_info=None,
                 )
 
         else:
@@ -156,7 +162,7 @@ async def watch(
                     code=run_code,
                     cancel_watch=False,
                 )
-                rc, stdout = await runners.shell(run_params, new_args, cwd, None)
+                rc, stdout = await runners.shell(run_params, new_args, cwd)
 
     async def watch_run(event):
         new_args = args.copy()
@@ -164,15 +170,6 @@ async def watch(
         if event is not None:
             new_args["CHANGED"] = event.src_path
 
-        # if run_info is None:
-        #     new_info = {}
-        # else:
-        #     new_info = run_info.copy()
-        # new_info["record_stdout"] = True
-        # new_info["hide_stdout"] = False
-        # new_info["single"] = run_info is None
-        # new_info["procs"] = _procs
-        # new_info["name"] = params.name
         rc, stdout = await runners.shell(
             params,
             new_args,
@@ -183,7 +180,6 @@ async def watch(
         )
         if rc != 0:
             await catch(rc, stdout)
-        # print("WATCH_)RUN IS OVER")
 
     _procs[params.name] = None
     handler = Handler(_procs, params, watch_run)
@@ -195,9 +191,11 @@ async def watch(
         preamble = f"{params.name}{' ' * (padding - len(params.name))} | "
 
     if watch_files is not None:
+        # files passed in via CLI override, don't run anything
         paths_to_watch = [Path(x) for x in watch_files]
     else:
         if params.watch in commands:
+            # Recurse down to another run to get its output
             dependency_params = commands[params.watch]
             rc, stdout = await run(
                 dependency_params,
@@ -209,6 +207,8 @@ async def watch(
                 hide_output=True,
             )
         elif isfloat(params.watch):
+            # Passed a timer so no need to listen to any files, just sit here
+            # in a loop forever
             sleep_time = float(params.watch)
             print(
                 color(
@@ -220,6 +220,8 @@ async def watch(
                 await watch_run(None)
                 time.sleep(sleep_time)
         else:
+            # Inline shell code used, so issue an ad-hoc call to the default
+            # shell
             new_args = params.args.copy()
             new_args["CHANGED"] = ""
             run_code = params.watch + "\n"
@@ -238,21 +240,23 @@ async def watch(
             rc, stdout = await runners.shell(
                 run_params, new_args, cwd, hide_output=True
             )
+            # This is probably unreachable
             if rc != 0:
                 error(f"watch command failed: {run_code.strip()}\n{stdout.rstrip()}")
-                return rc, None
 
         paths_to_watch = [
             Path(x.strip()) for x in stdout.split("\n") if x.strip() != ""
         ]
 
+    # Check that any files referenced exist (watchdog will error out otherwise
+    # with a less helpful message)
     non_existent = [p for p in paths_to_watch if not p.exists()]
     if len(non_existent):
         non_existent = ", ".join([str(x) for x in non_existent])
         error(f"Some paths to watch didn't exist: {non_existent}")
 
+    # Output watch status
     paths_str = " ".join([str(x) for x in paths_to_watch])
-
     if len(paths_str) > 140 and not VERBOSE:
         print(color(f"{preamble}watching {len(paths_to_watch)} files", Colors.YELLOW))
     else:
@@ -263,9 +267,12 @@ async def watch(
             )
         )
 
+    # Register all the relevant paths with watchdog
     observer = watchdog.observers.Observer()
 
     for path in paths_to_watch:
+        # TODO: inotify limits seem pretty low (around 100?), so watching a whole
+        # repo doesn't work
         observer.schedule(handler, str(path.resolve()), recursive=False)
 
     observer.start()
@@ -311,6 +318,8 @@ async def run(
                     f"'{dep}' command not found in rfile but was specified as a dependency of '{params.name}'"
                 )
 
+        # Gather a set of coroutines for each dependency. These all run in the
+        # same async loop but yield for reading from stdout of each subprocess.
         dependency_runs = [
             run(
                 commands[dep],

@@ -333,16 +333,17 @@ class TestWatch(RFileTestCase):
 
         out, err = self.run_for(1, ["watch2"], content=rfile, action=edit)
         self.assertEqual("", err.strip())
-        self.assertEqual(
-            f"watching {fname}\nwatchin\nwatchin {fname}\nwatchin {fname}",
-            out.strip(),
-        )
+        self.assertTrue(out.strip().startswith(f"watching {fname}\n"))
+        msg = f"Full output:\n{out}"
+        lines = out.split("\n")
+        self.assertEqual(1, lines.count("watchin"), msg=msg)
+        self.assertNear(3, lines.count(f"watchin {fname}"), tolerance=1, msg=msg)
 
     @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
     def test_timed(self, rfile, fname):
         out, err = self.run_for(3, ["timed"], content=rfile)
-        self.assertEqual("ran\nran\nran\n", out)
+        self.assertEqual("watching every 1.0 seconds\nran\nran\nran\n", out)
 
     @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
@@ -362,6 +363,11 @@ class TestWatch(RFileTestCase):
             out.strip(),
         )
 
+    def assertNear(self, expected, actual, tolerance, msg):
+        self.assertTrue(
+            actual >= expected - tolerance or actual <= expected + tolerance, msg=msg
+        )
+
     @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
     def test_parallel_watch_write(self, rfile, fname):
@@ -376,20 +382,12 @@ class TestWatch(RFileTestCase):
         out, err = self.run_for(1, ["go3"], content=rfile, action=edit)
         self.assertEqual("", err.strip())
         lines = out.split("\n")
-        self.assertTrue(
-            f"go1 | watching {fname}" in lines[0:2], msg=f"Full output:\n{out}"
-        )
-        self.assertTrue(
-            f"go2 | watching {fname}" in lines[0:2], msg=f"Full output:\n{out}"
-        )
+        msg = f"Full output:\n{out}"
 
-        for i in range(2, 8, 2):
-            self.assertTrue(
-                f"go1 | go1" in lines[i : i + 2], msg=f"Full output:\n{out}"
-            )
-            self.assertTrue(
-                f"go2 | go2" in lines[i : i + 2], msg=f"Full output:\n{out}"
-            )
+        # Test is running in parallel, output isn't really guaranteed so just
+        # check that they both show up a few times
+        self.assertNear(4, lines.count("go1 | go1"), tolerance=1, msg=msg)
+        self.assertNear(4, lines.count("go2 | go2"), tolerance=1, msg=msg)
 
 
 if __name__ == "__main__":
