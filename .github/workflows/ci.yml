@@ -15,6 +15,8 @@ jobs:
           set -eux
           pip install -e .
       - name: Run tests
+        env:
+          IS_GHA: 1
         run: |
           set -eux
           r test --once

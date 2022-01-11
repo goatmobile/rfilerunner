@@ -7,6 +7,8 @@ import os
 
 from typing import List, Dict, Optional
 
+IS_GHA = os.getenv("IS_GHA", "0") == "1"
+
 
 class RFileTestCase(unittest.TestCase):
     def exec(
@@ -292,6 +294,7 @@ class TestWatch(RFileTestCase):
         self.assertEqual("", err.strip())
         self.assertEqual(f"watching {fname}\nstart\ndone", out.strip())
 
+    @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     def test_files_exist(self):
         out, err = self.run_for(
             1, ["watch2"], content=self.rfile_template.format(file="nonexistent.txt")
@@ -306,6 +309,7 @@ class TestWatch(RFileTestCase):
         self.assertEqual("", err.strip())
         self.assertEqual(f"watching {fname}\nwatchin", out.strip())
 
+    @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
     def test_watch_write(self, rfile, fname):
         def edit():
@@ -323,6 +327,7 @@ class TestWatch(RFileTestCase):
             out.strip(),
         )
 
+    @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
     def test_parallel_watch_write(self, rfile, fname):
         def edit():
