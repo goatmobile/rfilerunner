@@ -312,7 +312,7 @@ async def run(
             for i, dep in enumerate(params.deps)
         ]
 
-        if params.parallel:
+        if not no_parallel and params.parallel:
             await ngather(dependency_runs)
         else:
             for c in dependency_runs:

@@ -81,22 +81,32 @@ def show_subcommand_help(command, params):
         f"{color('usage', Colors.YELLOW)}: r [-v, --verbose] {command} [-h, --help]"
     )
     args_desc = ""
-    if len(params.args) > 0:
-        args = [f"[--{a} {a.upper()}]" for a in params.args]
+    args = [f"[--{a} {a.upper()}]" for a in params.args]
+    if len(args) > 0:
         preamble += " " + " ".join(args)
 
-        arg_strs = [("  -h, --help", "show this help message and exit")]
-        if params.watch:
-            arg_strs.append(("  --no-watch / --once", "disable 'watch' behavior and only run once"))
-        for name, help in params.args.items():
-            arg_strs.append((f"  --{name}", help))
-        padding = max(len(x) for x, _ in arg_strs)
-        args_descs = [
-            f"{name}{' ' * (padding - len(name) + 2)}{help}" for name, help in arg_strs
-        ]
-        args_desc = f"\n\n{color('optional arguments:', Colors.BOLD)}\n" + "\n".join(
-            args_descs
+    arg_strs = [("  -h, --help", "[r] show this help message and exit")]
+    if params.watch:
+        arg_strs.append(
+            ("  --no-watch / --once", "[r] disable 'watch' behavior and only run once")
         )
+    if params.parallel:
+        arg_strs.append(
+            (
+                "  --no-parallel / --serial",
+                "[r] disable 'parallel' behavior and run dependencies serially",
+            )
+        )
+
+    for name, help in params.args.items():
+        arg_strs.append((f"  --{name}", help))
+    padding = max(len(x) for x, _ in arg_strs)
+    args_descs = [
+        f"{name}{' ' * (padding - len(name) + 2)}{help}" for name, help in arg_strs
+    ]
+    args_desc = f"\n\n{color('optional arguments:', Colors.BOLD)}\n" + "\n".join(
+        args_descs
+    )
     print(f"{preamble}\n\n    {params.help}{args_desc}")
     exit(0)
 
@@ -316,10 +326,14 @@ def cli():
     params = commands[command]
     for name, help in params.args.items():
         inner_parser.add_argument(f"--{name}")
-    
+
     if params.watch:
         inner_parser.add_argument("--no-watch", action="store_true")
         inner_parser.add_argument("--once", action="store_true")
+
+    if params.parallel:
+        inner_parser.add_argument("--no-parallel", action="store_true")
+        inner_parser.add_argument("--serial", action="store_true")
 
     subparser_args, subparser_other = inner_parser.parse_known_args()
 
@@ -336,10 +350,23 @@ def cli():
         value = getattr(subparser_args, name, None)
         if value is not None:
             runtime_args[name] = value
-    
+
     no_watch = False
-    if subparser_args.no_watch or subparser_args.once:
+    if params.watch and (subparser_args.no_watch or subparser_args.once):
         no_watch = True
 
-    code, stdout = asyncio.run(run(params, runtime_args, commands, cwd=rfile.parent, no_watch=no_watch, no_parallel=False))
+    no_parallel = False
+    if params.parallel and (subparser_args.no_parallel or subparser_args.serial):
+        no_parallel = True
+
+    code, stdout = asyncio.run(
+        run(
+            params,
+            runtime_args,
+            commands,
+            cwd=rfile.parent,
+            no_watch=no_watch,
+            no_parallel=no_parallel,
+        )
+    )
     exit(code)
