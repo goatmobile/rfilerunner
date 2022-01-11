@@ -1,6 +1,6 @@
 # rfilerunner
 
-rfilerunner is a simple command runner, similar to [`just`](https://github.com/casey/just) or a simple Makefile.
+rfilerunner runs commands, similar to [`just`](https://github.com/casey/just) or a simple Makefile.
 This installs an `r` executable into your PATH that reads from an rfile, which is a YAML file that runs commands in some interpreter (e.g. shell, Python).
 
 ```bash
