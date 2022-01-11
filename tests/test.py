@@ -128,17 +128,20 @@ class TestHelp(RFileTestCase):
           """,
             out,
         )
-    
+
     def test_deps_help(self):
         out = self.rrun(["go3", "--help"])
-        self.assertHelp("""
+        self.assertHelp(
+            """
             usage: r [-v, --verbose] go3 [-h, --help]
 
                 run go2 and go
 
             optional arguments:
               -h, --help  [r] show this help message and exit
-            """, out)
+            """,
+            out,
+        )
 
     def test_inferred_help(self):
         out = self.rrun(["realscript", "--help"])
