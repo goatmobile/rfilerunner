@@ -117,6 +117,7 @@ async def watch(
     cwd: str,
     padding: int,
     run_idx: Optional[int],
+    watch_files: Optional[List[str]] = None,
 ):
     async def catch(rc, stdout):
         pass
@@ -185,44 +186,47 @@ async def watch(
             await catch(rc, stdout)
         # print("WATCH_)RUN IS OVER")
 
-    if params.watch in commands:
-        dependency_params = commands[params.watch]
-        rc, stdout = await run(
-            dependency_params,
-            args,
-            commands,
-            cwd,
-            padding=padding,
-            run_idx=run_idx,
-            hide_output=True,
-        )
-    # elif isfloat(params.watch):
-    #     sleep_time = float(params.watch)
-    #     while True:
-    #         await watch_run(None)
-    #         time.sleep(sleep_time)
+    if watch_files is not None:
+        paths_to_watch = [Path(x) for x in watch_files]
     else:
-        new_args = params.args.copy()
-        new_args["CHANGED"] = ""
-        run_code = params.watch + "\n"
-        run_params = Params(
-            name=f"{params.name}-watch",
-            shell=params.shell,
-            help="",
-            args=new_args,
-            deps=[],
-            parallel=False,
-            watch=None,
-            catch=None,
-            code=run_code,
-            cancel_watch=False,
-        )
-        rc, stdout = await runners.shell(run_params, new_args, cwd, hide_output=True)
-        if rc != 0:
-            error(f"watch command failed: {run_code.strip()}\n{stdout.rstrip()}")
-            return rc, None
+        if params.watch in commands:
+            dependency_params = commands[params.watch]
+            rc, stdout = await run(
+                dependency_params,
+                args,
+                commands,
+                cwd,
+                padding=padding,
+                run_idx=run_idx,
+                hide_output=True,
+            )
+        # elif isfloat(params.watch):
+        #     sleep_time = float(params.watch)
+        #     while True:
+        #         await watch_run(None)
+        #         time.sleep(sleep_time)
+        else:
+            new_args = params.args.copy()
+            new_args["CHANGED"] = ""
+            run_code = params.watch + "\n"
+            run_params = Params(
+                name=f"{params.name}-watch",
+                shell=params.shell,
+                help="",
+                args=new_args,
+                deps=[],
+                parallel=False,
+                watch=None,
+                catch=None,
+                code=run_code,
+                cancel_watch=False,
+            )
+            rc, stdout = await runners.shell(run_params, new_args, cwd, hide_output=True)
+            if rc != 0:
+                error(f"watch command failed: {run_code.strip()}\n{stdout.rstrip()}")
+                return rc, None
 
-    paths_to_watch = [Path(x.strip()) for x in stdout.split("\n") if x.strip() != ""]
+        paths_to_watch = [Path(x.strip()) for x in stdout.split("\n") if x.strip() != ""]
 
     non_existent = [p for p in paths_to_watch if not p.exists()]
     if len(non_existent):
@@ -278,6 +282,7 @@ async def run(
     hide_output: bool = False,
     no_watch: bool = False,
     no_parallel: bool = False,
+    watch_files: Optional[List[str]] = None,
 ) -> Tuple[int, str]:
     """
     Execute an rfile command and any transitive dependencies.
@@ -322,7 +327,7 @@ async def run(
     if params.watch is not None and not no_watch:
         # This shouldn't ever actually return, just spin forever watching the
         # specified files
-        return await watch(params, args, commands, cwd, padding, run_idx)
+        return await watch(params, args, commands, cwd, padding, run_idx, watch_files=watch_files)
     else:
         # Normal run, determine the runner based on params.shell
         runner = runners.generic

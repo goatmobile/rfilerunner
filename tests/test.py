@@ -167,9 +167,10 @@ class TestHelp(RFileTestCase):
 
         optional arguments:
           -h, --help                [r] show this help message and exit
-          --no-watch / --once       [r] disable 'watch' behavior and only run once
+          --no-watch / --once       [r] disable '# watch' behavior and only run once
+          --watch WATCH             [r] comma-separated list of files to watch (override '# watch')
           --no-parallel / --serial  [r] disable 'parallel' behavior and run dependencies serially
-          --pyarg                   a python arg
+          --pyarg PYARG             a python arg
           """,
             out,
         )
@@ -218,7 +219,7 @@ class TestBigger(RFileTestCase):
 
     def test_args(self):
         output = self.rrun(["something", "--help"])
-        self.assertTrue(output.endswith("--myarg     a description of myarg\n"))
+        self.assertTrue(output.endswith("--myarg MYARG  a description of myarg\n"))
 
         output2 = self.rrun(["something", "--myarg", "abc"])
         self.assertEqual("abc\nabc\n", output2)

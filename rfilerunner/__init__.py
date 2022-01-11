@@ -87,7 +87,10 @@ def show_subcommand_help(command, params):
     arg_strs = [("  -h, --help", "[r] show this help message and exit")]
     if params.watch:
         arg_strs.append(
-            ("  --no-watch / --once", "[r] disable 'watch' behavior and only run once")
+            ("  --no-watch / --once", "[r] disable '# watch' behavior and only run once")
+        )
+        arg_strs.append(
+            ("  --watch WATCH", "[r] comma-separated list of files to watch (override '# watch')")
         )
     if params.parallel:
         arg_strs.append(
@@ -98,7 +101,7 @@ def show_subcommand_help(command, params):
         )
 
     for name, help in params.args.items():
-        arg_strs.append((f"  --{name}", help))
+        arg_strs.append((f"  --{name} {name.upper()}", help))
     padding = max(len(x) for x, _ in arg_strs)
     args_descs = [
         f"{name}{' ' * (padding - len(name) + 2)}{help}" for name, help in arg_strs
@@ -331,6 +334,7 @@ def cli():
     if params.watch:
         inner_parser.add_argument("--no-watch", action="store_true")
         inner_parser.add_argument("--once", action="store_true")
+        inner_parser.add_argument("--watch")
 
     if params.parallel:
         inner_parser.add_argument("--no-parallel", action="store_true")
@@ -359,6 +363,13 @@ def cli():
     no_parallel = False
     if params.parallel and (subparser_args.no_parallel or subparser_args.serial):
         no_parallel = True
+    
+    watch_files = None
+    if params.watch and subparser_args.watch:
+        if no_watch:
+            error("Cannot use --watch with --no-watch/--once")
+        
+        watch_files = [x.strip() for x in subparser_args.watch.split(",")]
 
     code, stdout = asyncio.run(
         run(
@@ -368,6 +379,7 @@ def cli():
             cwd=rfile.parent,
             no_watch=no_watch,
             no_parallel=no_parallel,
+            watch_files=watch_files,
         )
     )
     exit(code)
