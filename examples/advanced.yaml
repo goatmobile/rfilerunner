@@ -12,6 +12,7 @@ go3: |
   echo go3
 
 realscript: |
+  # arg: ok (set ok)
   if [ -z $OK ]; then
       echo OK not set
   else
