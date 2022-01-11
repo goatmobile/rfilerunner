@@ -209,6 +209,18 @@ find-files: |
   find . -type f
 ```
 
+For long running commands it may be preferred to cancel their run before running the next event, this can be done via the `# cancel` directive.
+
+```yaml
+# Edits to `test.txt` will cause the running command to be killed and restarted
+long: |
+  # watch: echo test.txt
+  # cancel
+  echo hi
+  sleep 30
+  echo bye
+```
+
 #### Catch
 
 If a watch command fails, you can specify another script/command to run on each failure. `ERROR` will contain the output with stdout and stderr intermixed (ANSI color codes are removed, the full message can be found in `ERROR_COLOR`).

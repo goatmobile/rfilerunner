@@ -260,6 +260,13 @@ class TestWatch(RFileTestCase):
         sleep 3
         echo done
 
+    watch-cancel: |
+        # watch: echo {file}
+        # cancel
+        echo start
+        sleep 3
+        echo done
+
     watch2: |
         # watch: files
         echo watchin $CHANGED
@@ -280,6 +287,10 @@ class TestWatch(RFileTestCase):
         # dep: go1
         # dep: go2
         echo go3
+
+    timed: |
+        # watch: 1
+        echo ran
     """
 
     @wrap_with_temp
@@ -324,6 +335,30 @@ class TestWatch(RFileTestCase):
         self.assertEqual("", err.strip())
         self.assertEqual(
             f"watching {fname}\nwatchin\nwatchin {fname}\nwatchin {fname}",
+            out.strip(),
+        )
+
+    @unittest.skipIf(IS_GHA, "doesn't work in GHA")
+    @wrap_with_temp
+    def test_timed(self, rfile, fname):
+        out, err = self.run_for(3, ["timed"], content=rfile)
+        self.assertEqual("ran\nran\nran\n", out)
+
+    @unittest.skipIf(IS_GHA, "doesn't work in GHA")
+    @wrap_with_temp
+    def test_cancel(self, rfile, fname):
+        def edit():
+            time.sleep(1)
+            with open(fname, "w") as f:
+                f.write("hello")
+            time.sleep(1)
+            with open(fname, "w") as f:
+                f.write("hello2")
+
+        out, err = self.run_for(5, ["watch-cancel"], content=rfile, action=edit)
+        self.assertEqual("", err.strip())
+        self.assertEqual(
+            f"watching {fname}\nstart\nstart\nstart\ndone",
             out.strip(),
         )
 

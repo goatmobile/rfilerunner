@@ -95,7 +95,6 @@ class Handler(watchdog.events.FileSystemEventHandler):
                 self.last_handle.cancel()
 
             verbose(event)
-            print(event)
 
             if self.procs[self.params.name] is not None:
                 try:
@@ -186,6 +185,15 @@ async def watch(
             await catch(rc, stdout)
         # print("WATCH_)RUN IS OVER")
 
+    _procs[params.name] = None
+    handler = Handler(_procs, params, watch_run)
+    if run_idx is None:
+        # no prefix if this isn't run alongside other commands
+        preamble = ""
+    else:
+        # prepend with: "<name> |"
+        preamble = f"{params.name}{' ' * (padding - len(params.name))} | "
+
     if watch_files is not None:
         paths_to_watch = [Path(x) for x in watch_files]
     else:
@@ -200,11 +208,17 @@ async def watch(
                 run_idx=run_idx,
                 hide_output=True,
             )
-        # elif isfloat(params.watch):
-        #     sleep_time = float(params.watch)
-        #     while True:
-        #         await watch_run(None)
-        #         time.sleep(sleep_time)
+        elif isfloat(params.watch):
+            sleep_time = float(params.watch)
+            print(
+                color(
+                    f"{preamble}watching every {sleep_time} seconds",
+                    Colors.YELLOW,
+                )
+            )
+            while True:
+                await watch_run(None)
+                time.sleep(sleep_time)
         else:
             new_args = params.args.copy()
             new_args["CHANGED"] = ""
@@ -238,12 +252,7 @@ async def watch(
         error(f"Some paths to watch didn't exist: {non_existent}")
 
     paths_str = " ".join([str(x) for x in paths_to_watch])
-    if run_idx is None:
-        # no prefix if this isn't run alongside other commands
-        preamble = ""
-    else:
-        # prepend with: "<name> |"
-        preamble = f"{params.name}{' ' * (padding - len(params.name))} | "
+
     if len(paths_str) > 140 and not VERBOSE:
         print(color(f"{preamble}watching {len(paths_to_watch)} files", Colors.YELLOW))
     else:
@@ -255,9 +264,6 @@ async def watch(
         )
 
     observer = watchdog.observers.Observer()
-
-    _procs[params.name] = None
-    handler = Handler(_procs, params, watch_run)
 
     for path in paths_to_watch:
         observer.schedule(handler, str(path.resolve()), recursive=False)

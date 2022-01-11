@@ -26,6 +26,7 @@ fail: |
 
 long: |
   # watch: echo test.txt
+  # cancel
   echo hi
   sleep 5
   echo done
@@ -35,3 +36,12 @@ watch: |
   echo start
   sleep 3
   echo done
+
+wow: |
+  # parallel
+  # dep: black
+  # dep: timed
+
+timed: |
+  # watch: 1
+  echo ran
