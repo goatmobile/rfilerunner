@@ -279,6 +279,8 @@ async def run(
     padding: int = 0,
     run_idx: Optional[int] = None,
     hide_output: bool = False,
+    no_watch: bool = False,
+    no_parallel: bool = False,
 ) -> Tuple[int, str]:
     """
     Execute an rfile command and any transitive dependencies.
@@ -320,7 +322,7 @@ async def run(
         # No actual code (but can't do this any earlier in case there are dependencies)
         return 0, ""
 
-    if params.watch is not None:
+    if params.watch is not None and not no_watch:
         # This shouldn't ever actually return, just spin forever watching the
         # specified files
         return await watch(params, args, commands, cwd, padding, run_idx)

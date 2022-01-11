@@ -2,6 +2,7 @@ import sys
 import os
 import textwrap
 import argparse
+from typing_extensions import runtime
 import yaml
 import asyncio
 import signal
@@ -75,9 +76,7 @@ def show_help(missing_file: bool, commands, error=None):
     exit(0)
 
 
-def show_subcommand_help(command, options):
-    params = options
-
+def show_subcommand_help(command, params):
     preamble = (
         f"{color('usage', Colors.YELLOW)}: r [-v, --verbose] {command} [-h, --help]"
     )
@@ -87,6 +86,8 @@ def show_subcommand_help(command, options):
         preamble += " " + " ".join(args)
 
         arg_strs = [("  -h, --help", "show this help message and exit")]
+        if params.watch:
+            arg_strs.append(("  --no-watch / --once", "disable 'watch' behavior and only run once"))
         for name, help in params.args.items():
             arg_strs.append((f"  --{name}", help))
         padding = max(len(x) for x, _ in arg_strs)
@@ -315,6 +316,10 @@ def cli():
     params = commands[command]
     for name, help in params.args.items():
         inner_parser.add_argument(f"--{name}")
+    
+    if params.watch:
+        inner_parser.add_argument("--no-watch", action="store_true")
+        inner_parser.add_argument("--once", action="store_true")
 
     subparser_args, subparser_other = inner_parser.parse_known_args()
 
@@ -331,6 +336,10 @@ def cli():
         value = getattr(subparser_args, name, None)
         if value is not None:
             runtime_args[name] = value
+    
+    no_watch = False
+    if subparser_args.no_watch or subparser_args.once:
+        no_watch = True
 
-    code, stdout = asyncio.run(run(params, runtime_args, commands, cwd=rfile.parent))
+    code, stdout = asyncio.run(run(params, runtime_args, commands, cwd=rfile.parent, no_watch=no_watch, no_parallel=False))
     exit(code)

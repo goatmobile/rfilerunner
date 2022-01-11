@@ -73,7 +73,7 @@ async def run_in_interpreter(
         command_args = [f_w.name] + list(args.values())
         verbose(f"  running {command}")
 
-        # print("EXEC", params.shell, params.code.strip())
+        padding = padding - len(params.name)
         # print(params.code)
         # print(run_info)
         # print(params.shell)

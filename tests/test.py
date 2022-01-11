@@ -137,7 +137,9 @@ class TestBigger(RFileTestCase):
 
     def test_deps(self):
         output = self.zrun(["go3"])
-        self.assertEqual("wow\nhello\ngo3\n", output)
+        self.assertEqual("go2 | wow\n"
+                         "go  | hello\n"
+                         "go3\n", output)
 
     def test_prefix(self):
         output = self.zrun(["some"])
