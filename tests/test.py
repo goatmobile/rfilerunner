@@ -175,19 +175,33 @@ class TestWatch(RFileTestCase):
     
     files: |
         echo {file}
+
+    go1: |
+        # watch: echo {file}
+        echo go1
+    
+    go2: |
+        # watch: echo {file}
+        echo go2
+    
+    go3: |
+        # parallel
+        # dep: go1
+        # dep: go2
+        echo go3
     """
 
     @wrap_with_temp
     def test_run(self, rfile, fname):
         out, err = self.run_for(1, [], content=rfile)
         self.assertEqual("", err.strip())
-        self.assertEqual(f"[watching] {fname}\nstart", out.strip())
+        self.assertEqual(f"watching {fname}\nstart", out.strip())
 
     @wrap_with_temp
     def test_multirun(self, rfile, fname):
         out, err = self.run_for(5, [], content=rfile)
         self.assertEqual("", err.strip())
-        self.assertEqual(f"[watching] {fname}\nstart\ndone", out.strip())
+        self.assertEqual(f"watching {fname}\nstart\ndone", out.strip())
 
     def test_files_exist(self):
         out, err = self.run_for(
@@ -201,7 +215,7 @@ class TestWatch(RFileTestCase):
     def test_watch_command(self, rfile, fname):
         out, err = self.run_for(1, ["watch2"], content=rfile)
         self.assertEqual("", err.strip())
-        self.assertEqual(f"[watching] {fname}\nwatchin", out.strip())
+        self.assertEqual(f"watching {fname}\nwatchin", out.strip())
 
     @wrap_with_temp
     def test_watch_write(self, rfile, fname):
@@ -216,9 +230,29 @@ class TestWatch(RFileTestCase):
         out, err = self.run_for(1, ["watch2"], content=rfile, action=edit)
         self.assertEqual("", err.strip())
         self.assertEqual(
-            f"[watching] {fname}\nwatchin\nwatchin {fname}\nwatchin {fname}",
+            f"watching {fname}\nwatchin\nwatchin {fname}\nwatchin {fname}",
             out.strip(),
         )
+
+    @wrap_with_temp
+    def test_parallel_watch_write(self, rfile, fname):
+        def edit():
+            time.sleep(1)
+            with open(fname, "w") as f:
+                f.write("hello")
+            time.sleep(1)
+            with open(fname, "w") as f:
+                f.write("hello2")
+
+        out, err = self.run_for(1, ["go3"], content=rfile, action=edit)
+        self.assertEqual("", err.strip())
+        lines = out.split("\n")
+        self.assertTrue(f"go1 | watching {fname}" in lines[0:2])
+        self.assertTrue(f"go2 | watching {fname}" in lines[0:2])
+
+        for i in range(2, 8, 2):
+            self.assertTrue(f"go1 | go1" in lines[i : i + 2])
+            self.assertTrue(f"go2 | go2" in lines[i : i + 2])
 
 
 if __name__ == "__main__":

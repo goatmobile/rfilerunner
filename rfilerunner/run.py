@@ -229,24 +229,21 @@ async def watch(
         non_existent = ", ".join([str(x) for x in non_existent])
         error(f"Some paths to watch didn't exist: {non_existent}")
 
+    paths_str = " ".join([str(x) for x in paths_to_watch])
     if run_idx is None:
         # no prefix if this isn't run alongside other commands
-        info_msg = ""
+        preamble = ""
     else:
         # prepend with: "<name> |"
-        info_msg = color(
-            f"{color_from_run(run_idx)}{params.name}{Colors.END}{' ' * padding} | ",
-            Colors.YELLOW,
-        )
-
-    paths_str = " ".join([str(x) for x in paths_to_watch])
-    if len(paths_str) > 100 and not VERBOSE:
-        print(
-            f"{color('[watching]', Colors.YELLOW)} {info_msg}watching {len(paths_to_watch)} files"
-        )
+        preamble = f"{params.name}{' ' * (padding - len(params.name))} | "
+    if len(paths_str) > 140 and not VERBOSE:
+        print(color(f"{preamble}watching {len(paths_to_watch)} files", Colors.YELLOW))
     else:
         print(
-            f"{color('[watching]', Colors.YELLOW)} {info_msg}{' '.join([str(x) for x in paths_to_watch])}"
+            color(
+                f"{preamble}watching {' '.join([str(x) for x in paths_to_watch])}",
+                Colors.YELLOW,
+            )
         )
 
     observer = watchdog.observers.Observer()
