@@ -37,7 +37,7 @@ class RFileTestCase(unittest.TestCase):
             )
             return proc
 
-    def zrun(self, *args, **kwargs):
+    def rrun(self, *args, **kwargs):
         proc = self.exec(subprocess.run, *args, **kwargs)
         return proc.stdout
 
@@ -72,18 +72,103 @@ class TestBasic(RFileTestCase):
     """
 
     def test_default(self):
-        output = self.zrun([])
+        output = self.rrun([])
         self.assertEqual("hi\n", output)
 
     def test_help(self):
-        output = self.zrun(["--help"])
+        output = self.rrun(["--help"])
         self.assertTrue(output, "available commands:\n    go     echo hi (default)\n")
 
     def test_nonexistent(self):
-        output = self.zrun(["nonexistent"])
+        output = self.rrun(["nonexistent"])
         self.assertTrue(output.startswith("usage"))
         self.assertTrue(
             output.endswith("No possible matches found for command 'nonexistent'\n")
+        )
+
+
+class TestHelp(RFileTestCase):
+    rfile = """
+    go: |
+        # some help
+        echo hello
+
+    go2: |
+        # help: some other help
+        echo wow
+
+    go3: |
+        # dep: go2
+        # dep: go
+        echo go3
+
+    realscript: |
+        echo no help on this one
+
+    python: |
+        # parallel
+        # watch: echo file.txt
+        # arg: pyarg (a python arg)
+    """
+    maxDiff = None
+
+    def assertHelp(self, expected, actual):
+        self.assertEqual(textwrap.dedent(expected).strip(), actual.strip())
+
+    def test_help_simple(self):
+        out = self.rrun(["go", "--help"])
+        self.assertHelp(
+            """
+        usage: r [-v, --verbose] go [-h, --help]
+
+            some help (default)
+
+        optional arguments:
+          -h, --help  [r] show this help message and exit
+          """,
+            out,
+        )
+    
+    def test_deps_help(self):
+        out = self.rrun(["go3", "--help"])
+        self.assertHelp("""
+            usage: r [-v, --verbose] go3 [-h, --help]
+
+                run go2 and go
+
+            optional arguments:
+              -h, --help  [r] show this help message and exit
+            """, out)
+
+    def test_inferred_help(self):
+        out = self.rrun(["realscript", "--help"])
+        self.assertHelp(
+            """
+            usage: r [-v, --verbose] realscript [-h, --help]
+
+                echo no help on this one
+
+            optional arguments:
+              -h, --help  [r] show this help message and exit
+            """,
+            out,
+        )
+
+    def test_extra_args(self):
+        out = self.rrun(["python", "--help"])
+        self.assertHelp(
+            """
+        usage: r [-v, --verbose] python [-h, --help] [--pyarg PYARG]
+
+            (no script found in command)
+
+        optional arguments:
+          -h, --help                [r] show this help message and exit
+          --no-watch / --once       [r] disable 'watch' behavior and only run once
+          --no-parallel / --serial  [r] disable 'parallel' behavior and run dependencies serially
+          --pyarg                   a python arg
+          """,
+            out,
         )
 
 
@@ -122,29 +207,29 @@ class TestBigger(RFileTestCase):
     """
 
     def test_realscript(self):
-        output = self.zrun(["realscript"])
+        output = self.rrun(["realscript"])
         self.assertEqual("OK not set\n", output)
 
-        output2 = self.zrun(["realscript"], env={"OK": "1"})
+        output2 = self.rrun(["realscript"], env={"OK": "1"})
         self.assertEqual("OK is set\n", output2)
 
     def test_args(self):
-        output = self.zrun(["something", "--help"])
+        output = self.rrun(["something", "--help"])
         self.assertTrue(output.endswith("--myarg     a description of myarg\n"))
 
-        output2 = self.zrun(["something", "--myarg", "abc"])
+        output2 = self.rrun(["something", "--myarg", "abc"])
         self.assertEqual("abc\nabc\n", output2)
 
     def test_deps(self):
-        output = self.zrun(["go3"])
+        output = self.rrun(["go3"])
         self.assertEqual("go2 | wow\n" "go  | hello\n" "go3\n", output)
 
     def test_prefix(self):
-        output = self.zrun(["some"])
+        output = self.rrun(["some"])
         self.assertTrue("Assuming 'some' is short for 'something'" in output)
 
     def test_python(self):
-        output = self.zrun(["python"])
+        output = self.rrun(["python"])
         lines = output.split("\n")
         self.assertEqual(len(lines), 4)
         self.assertEqual(lines[0], "{'pyarg': None}")

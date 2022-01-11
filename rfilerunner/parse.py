@@ -109,6 +109,8 @@ def parse(name: str, code: str, is_default: bool) -> Params:
     if help is None and len(deps) > 0:
         if len(deps) == 1:
             help = f"run {deps[0]}"
+        if len(deps) == 2:
+            help = f"run {deps[0]} and {deps[1]}"
         else:
             help = "run " + ", ".join(deps[:-1]) + ", and " + deps[-1]
 

@@ -107,7 +107,9 @@ def show_subcommand_help(command, params):
     args_desc = f"\n\n{color('optional arguments:', Colors.BOLD)}\n" + "\n".join(
         args_descs
     )
-    print(f"{preamble}\n\n    {params.help}{args_desc}")
+    print(
+        f"{preamble}\n\n    {params.help if len(params.help) > 0 else '(no script found in command)'}{args_desc}"
+    )
     exit(0)
 
 
