@@ -87,10 +87,16 @@ def show_subcommand_help(command, params):
     arg_strs = [("  -h, --help", "[r] show this help message and exit")]
     if params.watch:
         arg_strs.append(
-            ("  --no-watch / --once", "[r] disable '# watch' behavior and only run once")
+            (
+                "  --no-watch / --once",
+                "[r] disable '# watch' behavior and only run once",
+            )
         )
         arg_strs.append(
-            ("  --watch WATCH", "[r] comma-separated list of files to watch (override '# watch')")
+            (
+                "  --watch WATCH",
+                "[r] comma-separated list of files to watch (override '# watch')",
+            )
         )
     if params.parallel:
         arg_strs.append(
@@ -363,12 +369,12 @@ def cli():
     no_parallel = False
     if params.parallel and (subparser_args.no_parallel or subparser_args.serial):
         no_parallel = True
-    
+
     watch_files = None
     if params.watch and subparser_args.watch:
         if no_watch:
             error("Cannot use --watch with --no-watch/--once")
-        
+
         watch_files = [x.strip() for x in subparser_args.watch.split(",")]
 
     code, stdout = asyncio.run(

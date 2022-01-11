@@ -221,12 +221,16 @@ async def watch(
                 code=run_code,
                 cancel_watch=False,
             )
-            rc, stdout = await runners.shell(run_params, new_args, cwd, hide_output=True)
+            rc, stdout = await runners.shell(
+                run_params, new_args, cwd, hide_output=True
+            )
             if rc != 0:
                 error(f"watch command failed: {run_code.strip()}\n{stdout.rstrip()}")
                 return rc, None
 
-        paths_to_watch = [Path(x.strip()) for x in stdout.split("\n") if x.strip() != ""]
+        paths_to_watch = [
+            Path(x.strip()) for x in stdout.split("\n") if x.strip() != ""
+        ]
 
     non_existent = [p for p in paths_to_watch if not p.exists()]
     if len(non_existent):
@@ -327,7 +331,9 @@ async def run(
     if params.watch is not None and not no_watch:
         # This shouldn't ever actually return, just spin forever watching the
         # specified files
-        return await watch(params, args, commands, cwd, padding, run_idx, watch_files=watch_files)
+        return await watch(
+            params, args, commands, cwd, padding, run_idx, watch_files=watch_files
+        )
     else:
         # Normal run, determine the runner based on params.shell
         runner = runners.generic

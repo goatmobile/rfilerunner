@@ -336,12 +336,20 @@ class TestWatch(RFileTestCase):
         out, err = self.run_for(1, ["go3"], content=rfile, action=edit)
         self.assertEqual("", err.strip())
         lines = out.split("\n")
-        self.assertTrue(f"go1 | watching {fname}" in lines[0:2])
-        self.assertTrue(f"go2 | watching {fname}" in lines[0:2])
+        self.assertTrue(
+            f"go1 | watching {fname}" in lines[0:2], msg=f"Full output:\n{out}"
+        )
+        self.assertTrue(
+            f"go2 | watching {fname}" in lines[0:2], msg=f"Full output:\n{out}"
+        )
 
         for i in range(2, 8, 2):
-            self.assertTrue(f"go1 | go1" in lines[i : i + 2])
-            self.assertTrue(f"go2 | go2" in lines[i : i + 2])
+            self.assertTrue(
+                f"go1 | go1" in lines[i : i + 2], msg=f"Full output:\n{out}"
+            )
+            self.assertTrue(
+                f"go2 | go2" in lines[i : i + 2], msg=f"Full output:\n{out}"
+            )
 
 
 if __name__ == "__main__":
