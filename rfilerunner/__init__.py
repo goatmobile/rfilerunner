@@ -208,14 +208,22 @@ def handle_shell_completions(prev, options):
                 )
         else:
             if len(prev) == 1:
+                # print out all the commands if none has been entered yet
                 for command, params in options.items():
                     print(f"{command}\t{params.help}")
             elif len(prev) == 2:
-                curr_command = prev[-1]
-                if curr_command in options:
-                    params = options[curr_command]
-                    for arg, help in params.args.items():
-                        print(f"--{arg}\t{help}")
+                if prev[-1] == "-r" or prev[-1] == "--rfile":
+                    # re-implement file listing since that's what is needed here
+                    for item in Path(".").glob("*"):
+                        if item.is_file() and item.suffix in {".yaml", ".yml"}:
+                            print(item)
+                else:
+                    # options specific to a command, find it and print
+                    curr_command = prev[-1]
+                    if curr_command in options:
+                        params = options[curr_command]
+                        for arg, help in params.args.items():
+                            print(f"--{arg}\t{help}")
     else:
         print(f"Shell '{shell.name}' isn't supported, only these shells are: fish")
 
