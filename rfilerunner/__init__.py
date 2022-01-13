@@ -128,7 +128,7 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
-def locate_rfile(help: bool) -> str:
+def locate_rfile(help: bool, completing: bool) -> str:
     rfile_names = ["rfile", "rfile.yml", "rfile.yaml"]
     verbose(f"Guessing rfile from {rfile_names}")
     cwd = Path(os.getcwd())
@@ -161,7 +161,10 @@ def locate_rfile(help: bool) -> str:
         "File 'rfile' not found in this directory or parents! Make one! Here is an example:",
         Colors.RED,
     )
-    error(msg + sample)
+    if completing:
+        exit(0)
+    else:
+        error(msg + sample)
 
 
 def handle_shell_completions(prev, options):
@@ -261,9 +264,12 @@ def cli():
         if not rfile.exists():
             if args.help:
                 show_help(missing_file=True, commands=None)
+            if args.completions:
+                # Don't show errors when running completions
+                exit(0)
             error(f"Could not find rfile '{args.rfile}'")
     else:
-        rfile = locate_rfile(help=args.help)
+        rfile = locate_rfile(help=args.help, completing=args.completions)
 
     # Load the file
     internal_assert(rfile.exists(), "check rfile exists")
