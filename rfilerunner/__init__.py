@@ -5,6 +5,7 @@ import argparse
 import yaml
 import asyncio
 import signal
+import logging
 
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from rfilerunner.util import (
     error,
     internal_assert,
     check,
+    dump,
 )
 from rfilerunner.parse import parse
 from rfilerunner.run import run
@@ -130,7 +132,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 def locate_rfile(help: bool, completing: bool) -> str:
     rfile_names = ["rfile", "rfile.yml", "rfile.yaml"]
-    verbose(f"Guessing rfile from {rfile_names}")
+    logging.info(f"Guessing rfile from {dump(rfile_names)}")
     cwd = Path(os.getcwd())
 
     for part in [cwd] + list(cwd.parents):
@@ -138,6 +140,11 @@ def locate_rfile(help: bool, completing: bool) -> str:
         existing_rfiles = [f for f in possible_rfiles if f.exists() and f.is_file()]
         if len(existing_rfiles) == 1:
             return existing_rfiles[0]
+        elif len(existing_rfiles) > 1:
+            error(
+                "Ambiguous directory, only 1 file can be used. Use --rfile to manually choose "
+                f"a file.\nFound multiple possible rfiles: {dump([str(x) for x in existing_rfiles])}"
+            )
 
     sample = textwrap.dedent(
         """
@@ -251,7 +258,17 @@ def cli():
         default=None,
     )
     parser.add_argument("args", nargs=argparse.REMAINDER)
+
+    # Set up logging
+    formatter = logging.Formatter(
+        "[rfile %(asctime)s] %(levelname)s: %(message)s", "%Y-%m-%d %H:%M:%S"
+    )
+    logger = logging.getLogger()
+
     args, other = parser.parse_known_args()
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
+    logger.handlers[0].setFormatter(formatter)
+    logging.info(f"Invoked with args {dump(args)}")
 
     first_help = args.help
 
@@ -259,9 +276,10 @@ def cli():
         util.VERBOSE = True
 
     if args.rfile:
-        verbose(f"Using hardcoded rfile at {args.rfile}")
+        logging.info(f"Using hardcoded rfile at {dump(args.rfile)}")
         rfile = Path(args.rfile)
         if not rfile.exists():
+            logging.info(f"rfile at {dump(rfile.resolve())} doesn't exist")
             if args.help:
                 show_help(missing_file=True, commands=None)
             if args.completions:

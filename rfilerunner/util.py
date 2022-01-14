@@ -36,6 +36,10 @@ def error(error_message, code=1):
     os._exit(code)
 
 
+def dump(obj):
+    return json.dumps(obj, default=str)
+
+
 def verbose(message):
     if VERBOSE:
         print(message)
