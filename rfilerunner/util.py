@@ -12,7 +12,18 @@ from rfilerunner.colors import Colors, color
 
 NPROC = multiprocessing.cpu_count()
 c = Colors
-usable_colors = [c.BLUE, c.PURPLE, c.GREEN, c.YELLOW, c.LIGHT_RED, c.LIGHT_GREEN]
+usable_colors = [
+    c.GREEN,
+    c.PURPLE,
+    c.BLUE,
+    c.CYAN,
+    c.YELLOW,
+    c.LIGHT_CYAN,
+    c.LIGHT_GREEN,
+    c.LIGHT_BLUE,
+    c.LIGHT_PURPLE,
+    c.BROWN,
+]
 
 
 def cmd(s, **kwargs):
@@ -71,3 +82,10 @@ def jprint(o):
     JSON dump an object
     """
     print(json.dumps(o, indent=2, default=str))
+
+
+def merge(*dicts):
+    result = {}
+    for d in dicts:
+        result.update(d)
+    return result

@@ -14,6 +14,7 @@ from rfilerunner.util import (
     error,
     ngather,
     VERBOSE,
+    merge,
 )
 from rfilerunner.parse import Params
 from rfilerunner import runners
@@ -111,6 +112,59 @@ class Handler(watchdog.events.FileSystemEventHandler):
             asyncio.run(self.watch_run(event))
 
 
+def make_catch(
+    params: Params, args: Dict[str, str], commands: Dict[str, Params], cwd: str
+):
+    async def catch(rc, stdout):
+        pass
+
+    padding = len(params.name)
+    color = "\x1B[41m"
+
+    if params.catch is not None:
+        if params.catch in commands:
+            dependency_params = commands[params.catch]
+
+            async def catch(rc, stdout):
+                await run(
+                    dependency_params,
+                    merge(args, {"ERROR": strip_ansi(stdout), "ERROR_COLOR": stdout}),
+                    commands,
+                    cwd,
+                    run_idx=color,
+                    padding=padding,
+                )
+
+        else:
+
+            async def catch(rc, stdout):
+                new_args = merge(
+                    args, {"ERROR": strip_ansi(stdout), "ERROR_COLOR": stdout}
+                )
+                run_code = params.catch + "\n"
+                run_params = Params(
+                    name=f"{params.name}-catch",
+                    shell=params.shell,
+                    help="",
+                    args=new_args,
+                    deps=[],
+                    parallel=False,
+                    watch=None,
+                    catch=None,
+                    code=run_code,
+                    cancel_watch=False,
+                )
+                await runners.shell(
+                    run_params,
+                    new_args,
+                    cwd,
+                    run_idx=color,
+                    padding=padding,
+                )
+
+    return catch
+
+
 async def watch(
     params: Params,
     args: Dict[str, str],
@@ -125,44 +179,7 @@ async def watch(
     based on files or a timer).
     """
 
-    async def catch(rc, stdout):
-        pass
-
-    if params.catch is not None:
-        if params.catch in commands:
-            dependency_params = commands[params.catch]
-
-            async def catch(rc, stdout):
-                new_args = args.copy()
-                new_args["ERROR"] = strip_ansi(stdout)
-                new_args["ERROR_COLOR"] = stdout
-                rc, stdout = await run(
-                    dependency_params,
-                    new_args,
-                    commands,
-                    cwd,
-                )
-
-        else:
-
-            async def catch(rc, stdout):
-                new_args = args.copy()
-                new_args["ERROR"] = strip_ansi(stdout)
-                new_args["ERROR_COLOR"] = stdout
-                run_code = params.catch + "\n"
-                run_params = Params(
-                    name=f"{params.name}-catch",
-                    shell=params.shell,
-                    help="",
-                    args=new_args,
-                    deps=[],
-                    parallel=False,
-                    watch=None,
-                    catch=None,
-                    code=run_code,
-                    cancel_watch=False,
-                )
-                rc, stdout = await runners.shell(run_params, new_args, cwd)
+    catch = make_catch(params, args, commands, cwd)
 
     async def watch_run(event):
         new_args = args.copy()
@@ -222,8 +239,7 @@ async def watch(
         else:
             # Inline shell code used, so issue an ad-hoc call to the default
             # shell
-            new_args = params.args.copy()
-            new_args["CHANGED"] = ""
+            new_args = merge(params.args, {"CHANGED": ""})
             run_code = params.watch + "\n"
             run_params = Params(
                 name=f"{params.name}-watch",

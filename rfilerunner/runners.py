@@ -84,7 +84,10 @@ async def run_in_interpreter(
         padding = " " * padding
         color = ""
         if run_idx is not None:
-            color = util.usable_colors[run_idx % len(util.usable_colors)]
+            if isinstance(run_idx, str):
+                color = run_idx
+            else:
+                color = util.usable_colors[run_idx % len(util.usable_colors)]
 
         os.close(pty_w)
 
