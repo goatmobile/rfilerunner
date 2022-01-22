@@ -77,7 +77,8 @@ def worker(loop):
 
 
 class Handler(watchdog.events.FileSystemEventHandler):
-    def __init__(self, procs, params, watch_run):
+    def __init__(self, paths, procs, params, watch_run):
+        self.paths = set(str(Path(p).resolve()) for p in paths)
         self.last_handle = None
         self.loop = asyncio.new_event_loop()
         self.watch_run = watch_run
@@ -88,6 +89,15 @@ class Handler(watchdog.events.FileSystemEventHandler):
         worker_thread.start()
 
     def on_any_event(self, event):
+        if event.event_type in {"closed"}:
+            # Ignored events
+            return
+
+        if event.src_path not in self.paths:
+            # Not sure why these get triggered, but ignore events to files that
+            # aren't in the list
+            return
+
         # On a file change event, run the relevant script
         if self.params.cancel_watch:
 
@@ -200,7 +210,6 @@ async def watch(
             await catch(rc, stdout)
 
     _procs[params.name] = None
-    handler = Handler(_procs, params, watch_run)
     if run_idx is None:
         # no prefix if this isn't run alongside other commands
         preamble = ""
@@ -287,6 +296,7 @@ async def watch(
     # Register all the relevant paths with watchdog
     observer = watchdog.observers.Observer()
 
+    handler = Handler(paths_to_watch, _procs, params, watch_run)
     for path in paths_to_watch:
         # TODO: inotify limits seem pretty low (around 100?), so watching a whole
         # repo doesn't work
