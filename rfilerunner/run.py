@@ -5,6 +5,7 @@ import time
 import signal
 import re
 import logging
+import sys
 
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
@@ -16,6 +17,7 @@ from rfilerunner.util import (
     ngather,
     VERBOSE,
     merge,
+    RUN_IDX_STDIN,
 )
 from rfilerunner.parse import Params
 from rfilerunner import runners
@@ -72,8 +74,12 @@ async def aiojoin(observer):
 def worker(loop):
     # Worker thread to execute an async loop (filled with tasks by a file
     # listener)
+    # print(loop)
+    # id(loop)
     asyncio.set_event_loop(loop)
+    # print("Worker started")
     loop.run_forever()
+    # print("Worker STOPPED RUN_FOREVER")
 
 
 class Handler(watchdog.events.FileSystemEventHandler):
@@ -271,7 +277,7 @@ async def watch(
                 error(f"watch command failed: {run_code.strip()}\n{stdout.rstrip()}")
 
         paths_to_watch = [
-            Path(x.strip()) for x in stdout.split("\n") if x.strip() != ""
+            cwd / x.strip() for x in stdout.split("\n") if x.strip() != ""
         ]
 
     # Check that any files referenced exist (watchdog will error out otherwise
@@ -282,7 +288,7 @@ async def watch(
         error(f"Some paths to watch didn't exist: {non_existent}")
 
     # Output watch status
-    paths_str = " ".join([str(x) for x in paths_to_watch])
+    paths_str = " ".join([str(x.relative_to(cwd)) for x in paths_to_watch])
     if len(paths_str) > 140 and not VERBOSE:
         print(color(f"{preamble}watching {len(paths_to_watch)} files", Colors.YELLOW))
     else:
@@ -327,11 +333,64 @@ async def run(
     no_watch: bool = False,
     no_parallel: bool = False,
     watch_files: Optional[List[str]] = None,
+    listen_on_stdin: bool = False,
 ) -> Tuple[int, str]:
     """
     Execute an rfile command and any transitive dependencies.
     """
     verbose(f"Running command {params.name}, {params}")
+
+    last_handle = None
+    listen_loop = None
+    if listen_on_stdin and len(params.deps) > 0 and params.parallel:
+        listen_loop = asyncio.new_event_loop()
+
+        async def go(command):
+            await run(
+                commands[command],
+                {},
+                commands,
+                cwd,
+                padding=1,
+                run_idx=RUN_IDX_STDIN,
+            )
+
+        async def listen():
+            # print("Listening")
+            while True:
+                # print("awaiting aioread")
+
+                line = await runners.aioread(sys.stdin, mode="line")
+                command = line.strip()
+                if command == "":
+                    continue
+
+                if command not in commands:
+                    candidates = [item for item in commands if item.startswith(command)]
+                    if len(candidates) == 0:
+                        print(f"Command '{command}' not found in {commands.keys()}")
+                    elif len(candidates) == 1:
+                        await go(candidates[0])
+                    else:
+                        print(
+                            f"Command '{command}' not found and prefixes are ambiguous: {candidates}"
+                        )
+                else:
+                    await go(command)
+
+        # print("Thread start")
+        worker_thread = threading.Thread(target=worker, args=(listen_loop,))
+        worker_thread.start()
+
+        # print("schedule")
+        fut = asyncio.run_coroutine_threadsafe(listen(), loop=listen_loop)
+        # fut = listen_loop.call_soon_threadsafe(listen)
+
+        # run_coroutine_threadsafe
+        # print("scheduled with", fut)
+        # fut.result()
+        # asyncio.ensure_future(fut)
+        # last_handle = listen_loop.create_task(listen())
 
     # Run dependencies
     if len(params.deps) > 0:
@@ -388,4 +447,22 @@ async def run(
         rc, stdout = await runner(
             params, args, cwd, padding=padding, run_idx=run_idx, hide_output=hide_output
         )
+
+        # print(last_handle, listen_loop)
+        if last_handle:
+            # print("Cancel handle")
+            last_handle.cancel()
+
+        if listen_loop:
+            # print("Cancel loop handle")
+            listen_loop.call_soon_threadsafe(listen_loop.stop)
+            worker_thread.join()
+        if last_handle and listen_loop:
+            pass
+            # print("CAncelling")
+            # last_handle.cancel()
+            # listen_loop.call_soon_threadsafe(listen_loop.stop)
+            # print("Joining")
+        # print("Done")
+
         return rc, stdout

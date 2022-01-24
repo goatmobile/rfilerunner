@@ -36,8 +36,7 @@ ticka: |
   echo start ticka
   for (( ; ; ))
   do
-    echo ticka1
-    echo ticka2
+    echo ticka
     sleep 1
   done
   echo stop ticka
@@ -46,8 +45,7 @@ tickb: |
   echo start tickb
   for (( ; ; ))
   do
-    echo tickb1
-    echo tickb2
+    echo tickb
     sleep 1
   done
   echo stop tickb
@@ -57,3 +55,7 @@ alternate: |
   # dep: ticka
   # dep: tickb
   echo done
+
+save: |
+  # parallel
+  echo saving!

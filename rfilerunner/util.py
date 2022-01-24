@@ -25,6 +25,8 @@ usable_colors = [
     c.BROWN,
 ]
 
+RUN_IDX_STDIN = -2
+
 
 def cmd(s, **kwargs):
     print(s)

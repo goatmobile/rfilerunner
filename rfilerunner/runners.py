@@ -15,17 +15,23 @@ from rfilerunner.util import verbose, padding_from_run, color_from_run
 c = Colors
 
 
-def read(f):
-    return os.read(f, 1000)
+def read(f, mode):
+    if mode == "line":
+        # print("reading line")
+        l = f.readline()
+        # print("read line")
+        return l
+    else:
+        return os.read(f, 1000)
 
 
-async def aioread(f):
+async def aioread(f, mode: str = "buffered"):
     """
     asyncio wrapper for os.read
     detials: https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.run_in_executor
     """
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, read, f)
+    return await loop.run_in_executor(None, read, f, mode)
 
 
 async def run_in_interpreter(
@@ -86,6 +92,8 @@ async def run_in_interpreter(
         if run_idx is not None:
             if isinstance(run_idx, str):
                 color = run_idx
+            elif run_idx == util.RUN_IDX_STDIN:
+                color = "\x1B[45m"
             else:
                 color = util.usable_colors[run_idx % len(util.usable_colors)]
 
@@ -112,7 +120,7 @@ async def run_in_interpreter(
                     if output.endswith("\n"):
                         end = end - 1
                     for line in lines[:end]:
-                        print(f"{color}{params.name}{c.END}{padding} | {line.rstrip()}")
+                        print(f"{color}{params.name}{padding} |{c.END} {line.rstrip()}")
 
             recorded_stdout += output
             sys.stdout.flush()

@@ -8,7 +8,7 @@ import signal
 import logging
 
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
 
 from rfilerunner import util
@@ -124,6 +124,7 @@ def show_subcommand_help(command, params):
 
 
 def signal_handler(signal, frame):
+    # print("Sighandler FIRED")
     os._exit(0)
 
 
@@ -186,8 +187,37 @@ def handle_shell_completions(prev, options):
     else:
         prev = []
 
+    def handle_prev(prev: List[str]) -> bool:
+        if len(prev) == 1:
+            # print out all the commands if none has been entered yet
+            for command, params in options.items():
+                print(f"{command}\t{params.help}")
+
+            return True
+        elif len(prev) == 2:
+            if prev[-1] == "-r" or prev[-1] == "--rfile":
+                # re-implement file listing since that's what is needed here
+                for item in Path(".").glob("*"):
+                    if item.is_file() and item.suffix in {".yaml", ".yml"}:
+                        print(item)
+            else:
+                # options specific to a command, find it and print
+                curr_command = prev[-1]
+                if curr_command in options:
+                    params = options[curr_command]
+                    for arg, help in params.args.items():
+                        print(f"--{arg}\t{help}")
+
+            return True
+
+        return False
+
     if shell.name == "fish":
-        if hasattr(sys.stdout, "isatty") and sys.stdout.isatty():
+        if (
+            hasattr(sys.stdout, "isatty")
+            and sys.stdout.isatty()
+            and not os.getenv("DEBUG", "") == "1"
+        ):
             completions_dir = (
                 Path(os.path.expanduser("~")) / ".config" / "fish" / "completions"
             )
@@ -217,23 +247,15 @@ def handle_shell_completions(prev, options):
                     f"'no' chosen, aborting. You can install manually via:\necho '{printable}' > {out}"
                 )
         else:
-            if len(prev) == 1:
-                # print out all the commands if none has been entered yet
-                for command, params in options.items():
-                    print(f"{command}\t{params.help}")
-            elif len(prev) == 2:
-                if prev[-1] == "-r" or prev[-1] == "--rfile":
-                    # re-implement file listing since that's what is needed here
-                    for item in Path(".").glob("*"):
-                        if item.is_file() and item.suffix in {".yaml", ".yml"}:
-                            print(item)
-                else:
-                    # options specific to a command, find it and print
-                    curr_command = prev[-1]
-                    if curr_command in options:
-                        params = options[curr_command]
-                        for arg, help in params.args.items():
-                            print(f"--{arg}\t{help}")
+            test = handle_prev(prev)
+            if not test:
+                # maybe remove -r/--rfile args
+                for flag in ("-r", "--rfile"):
+                    if flag in prev:
+                        idx = prev.index(flag)
+                        prev = prev[:idx] + prev[idx + 2 :]
+
+                handle_prev(prev)
     else:
         print(f"Shell '{shell.name}' isn't supported, only these shells are: fish")
 
@@ -335,6 +357,7 @@ def cli():
     command = args.subparser
     if args.subparser is None:
         command = default
+
     if command not in commands:
         # If the commmand isn't a literal name of an command, try to guess it
         # based on the prefix
@@ -418,6 +441,7 @@ def cli():
             no_watch=no_watch,
             no_parallel=no_parallel,
             watch_files=watch_files,
+            listen_on_stdin=True,
         )
     )
     exit(code)

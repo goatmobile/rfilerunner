@@ -50,3 +50,6 @@ wow: |
 timed: |
   # watch: 1
   echo ran
+
+save: |
+  echo saving from main
