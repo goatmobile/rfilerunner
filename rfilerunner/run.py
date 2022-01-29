@@ -294,7 +294,7 @@ async def watch(
     else:
         print(
             color(
-                f"{preamble}watching {' '.join([str(x) for x in paths_to_watch])}",
+                f"{preamble}watching {paths_str}",
                 Colors.YELLOW,
             )
         )
