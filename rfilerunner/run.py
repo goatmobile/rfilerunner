@@ -4,6 +4,7 @@ import threading
 import time
 import signal
 import re
+import json
 import logging
 import sys
 
@@ -368,7 +369,9 @@ async def run(
                 if command not in commands:
                     candidates = [item for item in commands if item.startswith(command)]
                     if len(candidates) == 0:
-                        print(f"Command '{command}' not found in {commands.keys()}")
+                        print(
+                            f"Command '{command}' not found in {json.dumps(list(commands.keys()))}"
+                        )
                     elif len(candidates) == 1:
                         await go(candidates[0])
                     else:
