@@ -96,11 +96,11 @@ class Handler(watchdog.events.FileSystemEventHandler):
         worker_thread.start()
 
     def on_any_event(self, event):
-        if event.event_type in {"closed"}:
+        if event is not None and event.event_type in {"closed"}:
             # Ignored events
             return
 
-        if event.src_path not in self.paths:
+        if event is not None and event.src_path not in self.paths:
             # Not sure why these get triggered, but ignore events to files that
             # aren't in the list
             return
@@ -285,7 +285,7 @@ async def watch(
     # with a less helpful message)
     non_existent = [p for p in paths_to_watch if not p.exists()]
     if len(non_existent):
-        non_existent = ", ".join([str(x) for x in non_existent])
+        non_existent = ", ".join([str(x.relative_to(cwd)) for x in non_existent])
         error(f"Some paths to watch didn't exist: {non_existent}")
 
     # Output watch status

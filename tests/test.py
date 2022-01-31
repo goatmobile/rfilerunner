@@ -4,6 +4,7 @@ import subprocess
 import textwrap
 import tempfile
 import os
+from pathlib import Path
 
 from typing import List, Dict, Optional
 
@@ -297,13 +298,13 @@ class TestWatch(RFileTestCase):
     def test_run(self, rfile, fname):
         out, err = self.run_for(1, [], content=rfile)
         self.assertEqual("", err.strip())
-        self.assertEqual(f"watching {fname}\nstart", out.strip())
+        self.assertEqual(f"watching {Path(fname).name}\nstart", out.strip())
 
     @wrap_with_temp
     def test_multirun(self, rfile, fname):
         out, err = self.run_for(5, [], content=rfile)
         self.assertEqual("", err.strip())
-        self.assertEqual(f"watching {fname}\nstart\ndone", out.strip())
+        self.assertEqual(f"watching {Path(fname).name}\nstart\ndone", out.strip())
 
     @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     def test_files_exist(self):
@@ -318,7 +319,7 @@ class TestWatch(RFileTestCase):
     def test_watch_command(self, rfile, fname):
         out, err = self.run_for(1, ["watch2"], content=rfile)
         self.assertEqual("", err.strip())
-        self.assertEqual(f"watching {fname}\nwatchin", out.strip())
+        self.assertEqual(f"watching {Path(fname).name}\nwatchin", out.strip())
 
     @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
@@ -333,11 +334,13 @@ class TestWatch(RFileTestCase):
 
         out, err = self.run_for(1, ["watch2"], content=rfile, action=edit)
         self.assertEqual("", err.strip())
-        self.assertTrue(out.strip().startswith(f"watching {fname}\n"))
+        self.assertTrue(out.strip().startswith(f"watching {Path(fname).name}\n"))
         msg = f"Full output:\n{out}"
         lines = out.split("\n")
         self.assertEqual(1, lines.count("watchin"), msg=msg)
-        self.assertNear(3, lines.count(f"watchin {fname}"), tolerance=1, msg=msg)
+        self.assertNear(
+            3, lines.count(f"watchin {Path(fname).name}"), tolerance=1, msg=msg
+        )
 
     @unittest.skipIf(IS_GHA, "doesn't work in GHA")
     @wrap_with_temp
@@ -359,7 +362,7 @@ class TestWatch(RFileTestCase):
         out, err = self.run_for(5, ["watch-cancel"], content=rfile, action=edit)
         self.assertEqual("", err.strip())
         self.assertEqual(
-            f"watching {fname}\nstart\nstart\nstart\ndone",
+            f"watching {Path(fname).name}\nstart\nstart\nstart\ndone",
             out.strip(),
         )
 
