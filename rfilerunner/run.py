@@ -396,6 +396,7 @@ async def run(
         # last_handle = listen_loop.create_task(listen())
 
     # Run dependencies
+    failed = []
     if len(params.deps) > 0:
         # Actual invocations don't know about the others, so compute the padding
         # for each output line and pass it down
@@ -423,10 +424,24 @@ async def run(
         ]
 
         if not no_parallel and params.parallel:
-            await ngather(dependency_runs)
+            results = await ngather(dependency_runs)
+            for i, (rc, _) in enumerate(results):
+                if rc != 0:
+                    failed.append(params.deps[i])
         else:
-            for c in dependency_runs:
-                await c
+            for i, c in enumerate(dependency_runs):
+                rc, _ = await c
+                if rc != 0:
+                    failed.append(params.deps[i])
+
+    if len(failed) > 0:
+        msg = ", ".join([f"'{p}'" for p in failed])
+        print(
+            color(
+                f"Dependencies failed: {msg}, not running '{params.name}'", Colors.RED
+            )
+        )
+        return 0, None
 
     if params.code.strip() == "":
         # No actual code (but can't do this any earlier in case there are dependencies)
