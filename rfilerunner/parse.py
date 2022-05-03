@@ -111,12 +111,13 @@ def parse(name: str, code: str, is_default: bool) -> Params:
 
     # If this has no help but dependencies, infer a help based on the dependencies
     if help is None and len(deps) > 0:
-        if len(deps) == 1:
-            help = f"run {deps[0]}"
-        if len(deps) == 2:
-            help = f"run {deps[0]} and {deps[1]}"
+        color_deps = [Colors.END + color(d, Colors.PURPLE) for d in deps]
+        if len(color_deps) == 1:
+            help = f"run {color_deps[0]}"
+        if len(color_deps) == 2:
+            help = f"run {color_deps[0]} and {color_deps[1]}"
         else:
-            help = "run " + ", ".join(deps[:-1]) + ", and " + deps[-1]
+            help = "run " + ", ".join(color_deps[:-1]) + ", and " + color_deps[-1]
 
     full_code = "\n".join(code)
 
