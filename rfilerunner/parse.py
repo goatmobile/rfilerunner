@@ -22,6 +22,13 @@ class Params(NamedTuple):
     cancel_watch: bool
 
 
+class Arg(NamedTuple):
+    name: str
+    value: str
+    help: str
+    default: Optional[str]
+
+
 def default_shell() -> Optional[str]:
     """
     Find a shell on the system via shutil
@@ -35,7 +42,7 @@ def default_shell() -> Optional[str]:
     error(f"No shell found, tried: {items}")
 
 
-def parse_name_and_help(s: str) -> Tuple[str, str]:
+def parse_name_and_help(s: str) -> Tuple[str, str, str]:
     """
     handle stuff like
     # shell: /bin/sh (my help text)
@@ -47,7 +54,12 @@ def parse_name_and_help(s: str) -> Tuple[str, str]:
         rest = " ".join(parts[1:])
         rest = rest.lstrip("(").rstrip(")")
 
-    return name, rest
+    arg_parts = name.split("=")
+    default = None
+    if len(arg_parts) > 1:
+        name, default = arg_parts
+
+    return name, rest, default
 
 
 def parse(name: str, code: str, is_default: bool) -> Params:
@@ -88,12 +100,18 @@ def parse(name: str, code: str, is_default: bool) -> Params:
 
     for line in preamble:
         if line.startswith("# shell: "):
-            shell_path, help = parse_name_and_help(line[len("# shell: ") :])
+            shell_path, help, default = parse_name_and_help(line[len("# shell: ") :])
             shell = shutil.which(shell_path)
             check(shell is not None, f"Shell {shell_path} could not be found in PATH")
         elif line.startswith("# arg: "):
-            arg, arg_help = parse_name_and_help(line[len("# arg: ") :])
-            args[arg] = arg_help if arg_help is not None else ""
+            arg, arg_help, default = parse_name_and_help(line[len("# arg: ") :])
+            args[arg] = Arg(
+                name=arg,
+                value=None,
+                help=arg_help if arg_help is not None else "",
+                default=default,
+            )
+            # args[arg] = arg_help if arg_help is not None else ""
         elif line.startswith("# dep: "):
             deps.append(line[len("# dep: ") :])
         elif line.startswith("# help: "):

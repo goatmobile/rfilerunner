@@ -77,12 +77,12 @@ def show_help(missing_file: bool, commands, error=None):
     exit(0)
 
 
-def show_subcommand_help(command, params):
+def show_subcommand_help(command, params, unified_args):
     preamble = (
         f"{color('usage', Colors.YELLOW)}: r [-v, --verbose] {command} [-h, --help]"
     )
     args_desc = ""
-    args = [f"[--{a} {a.upper()}]" for a in params.args]
+    args = [f"[--{a} {a.upper()}]" for a in unified_args]
     if len(args) > 0:
         preamble += " " + " ".join(args)
 
@@ -108,8 +108,15 @@ def show_subcommand_help(command, params):
             )
         )
 
-    for name, help in params.args.items():
-        arg_strs.append((f"  --{name} {name.upper()}", help))
+    def make_arg_help(arg):
+        if arg.default is None:
+            return arg.help
+
+        return f"{arg.help} (default={arg.default})"
+
+    for name, arg in unified_args.items():
+        arg_strs.append((f"  --{name} {name.upper()}", make_arg_help(arg)))
+
     padding = max(len(x) for x, _ in arg_strs)
     args_descs = [
         f"{name}{' ' * (padding - len(name) + 2)}{help}" for name, help in arg_strs
@@ -389,8 +396,32 @@ def cli():
 
     inner_parser = argparse.ArgumentParser(add_help=False)
     params = commands[command]
-    for name, help in params.args.items():
-        inner_parser.add_argument(f"--{name}")
+
+    def add_arg(parser, arg_name, arg_arg):
+        if arg_arg.default:
+            inner_parser.add_argument(f"--{arg_name}", default=arg_arg.default)
+        else:
+            inner_parser.add_argument(f"--{arg_name}")
+
+    # for name, arg in params.args.items():
+    #     add_arg(inner_parser, name, arg)
+
+    seen_names = set()
+    seen_argnames = set()
+    unified_args = {}
+
+    def add_deps(param):
+        # print(param)
+        for name, arg in param.args.items():
+            # print("ADDING", name)
+            unified_args[name] = arg
+            seen_names.add(name)
+            add_arg(inner_parser, name, arg)
+
+        for dep in param.deps:
+            add_deps(commands[dep])
+
+    add_deps(params)
 
     if params.watch:
         inner_parser.add_argument("--no-watch", action="store_true")
@@ -407,12 +438,15 @@ def cli():
         if args.subparser is None:
             show_help(missing_file=False, commands=commands)
         else:
-            show_subcommand_help(command, commands[command])
+            show_subcommand_help(command, commands[command], unified_args)
 
     params = commands[command]
     runtime_args = {}
 
-    for name in params.args.keys():
+    # print(params.args.keys())
+    # print(subparser_args.library)
+    for name in unified_args.keys():
+        # for name in params.args.keys():
         value = getattr(subparser_args, name, None)
         if value is not None:
             runtime_args[name] = value
@@ -432,6 +466,7 @@ def cli():
 
         watch_files = [x.strip() for x in subparser_args.watch.split(",")]
 
+    # exit(0)
     code, stdout = asyncio.run(
         run(
             params,
