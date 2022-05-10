@@ -1,6 +1,6 @@
 # rfilerunner
 
-rfilerunner runs commands, similar to [`just`](https://github.com/casey/just) or a simple Makefile.
+[rfilerunner](https://pypi.org/project/rfilerunner/) runs commands, similar to [`just`](https://github.com/casey/just) or a simple Makefile.
 This installs an `r` executable into your PATH that reads from an rfile, which is a YAML file that runs commands in some interpreter (e.g. shell, Python).
 
 ```bash
@@ -17,7 +17,7 @@ something
 
 ## Installation
 
-Get the latest release
+Get the latest release from [PyPi](https://pypi.org/project/rfilerunner/)
 
 ```bash
 pip install rfilerunner
