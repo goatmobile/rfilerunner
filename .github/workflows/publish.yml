@@ -43,7 +43,7 @@ jobs:
           r --help
 
           OUT=$(r test)
-          if [ "$OUT" == "hello" ]; then
+          if [ "$OUT" == "hello\r" ]; then
             exit 0;
           else
             exit 1;
