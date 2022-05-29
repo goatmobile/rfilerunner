@@ -9,7 +9,7 @@ from typing import Dict, Optional, List, Set
 
 from rfilerunner import util
 from rfilerunner import colors, Colors
-from rfilerunner.parse import Params
+from rfilerunner.parse import Params, Arg
 from rfilerunner.util import verbose, padding_from_run, color_from_run
 
 c = Colors
@@ -47,11 +47,20 @@ async def run_in_interpreter(
     """
     Actually execute 'params'
     """
+
+    def _hack_fixup_args(a):
+        if isinstance(a, Arg):
+            if a.value is None:
+                return a.default
+            else:
+                return a.value
+        return a
+
     verbose(f"Shell executing: {params}")
     env = os.environ.copy()
     for k, v in args.items():
-        env[k.lower()] = v
-        env[k.upper()] = v
+        env[k.lower()] = _hack_fixup_args(v)
+        env[k.upper()] = _hack_fixup_args(v)
 
     single = run_idx is None
     recorded_stdout = ""
@@ -69,6 +78,7 @@ async def run_in_interpreter(
 
         command = [params.shell, f_w.name] + list(args.values())
         command_args = [f_w.name] + list(args.values())
+        command_args = [_hack_fixup_args(a) for a in command_args]
         verbose(f"  running {command}")
 
         # Calculate padding based on other runs
