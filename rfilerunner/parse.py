@@ -47,6 +47,10 @@ def parse_name_and_help(s: str) -> Tuple[str, str, str]:
     handle stuff like
     # shell: /bin/sh (my help text)
     """
+    default = None
+    if "=" in s:
+        s, default = s.split("=")
+
     parts = s.split(" ")
     name = parts[0]
     rest = None
@@ -55,9 +59,6 @@ def parse_name_and_help(s: str) -> Tuple[str, str, str]:
         rest = rest.lstrip("(").rstrip(")")
 
     arg_parts = name.split("=")
-    default = None
-    if len(arg_parts) > 1:
-        name, default = arg_parts
 
     return name, rest, default
 
