@@ -37,7 +37,7 @@ except Exception as e:
         version = f"git+{shorthash()}"
     except Exception as e:
         print("Failed to fetch shorthash", e)
-        version = "0.1.5"
+        version = "0.1.6"
 
 print("VERSION", version)
 setuptools.setup(

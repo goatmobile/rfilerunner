@@ -48,8 +48,12 @@ def parse_name_and_help(s: str) -> Tuple[str, str, str]:
     # shell: /bin/sh (my help text)
     """
     default = None
+    def_rest = None
     if "=" in s:
         s, default = s.split("=")
+        default_parts = default.split(" ")
+        default = default_parts[0]
+        def_rest = " ".join(default_parts[1:])
 
     parts = s.split(" ")
     name = parts[0]
@@ -58,6 +62,8 @@ def parse_name_and_help(s: str) -> Tuple[str, str, str]:
         rest = " ".join(parts[1:])
         rest = rest.lstrip("(").rstrip(")")
 
+    if def_rest is not None:
+        rest = def_rest
     arg_parts = name.split("=")
 
     return name, rest, default

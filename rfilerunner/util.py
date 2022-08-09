@@ -34,7 +34,7 @@ def cmd(s, **kwargs):
 
 
 def error(error_message, code=1):
-    print(f"{color('User error:', Colors.RED)} {error_message}", file=sys.stderr)
+    print(f"{color('Error:', Colors.RED)} {error_message}", file=sys.stderr)
     os._exit(code)
 
 

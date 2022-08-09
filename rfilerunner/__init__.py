@@ -24,19 +24,21 @@ from rfilerunner.parse import parse
 from rfilerunner.run import run
 
 
-def check_rfile(content: Any):
+def check_rfile(content: Any, string_content: str, file: str):
     """
     Check that an rfile's content is the right structure
     """
+    check(string_content.strip() != "", f"rfile at '{file}' is empty")
     check(
         isinstance(content, dict),
-        f"Expected rfile top level be a flat YAML dictionary, but found {type(content)}",
+        f"Expected rfile '{file}' top level be a flat YAML dictionary, but found {type(content)}\nIt should look something like:\n\n"
+        "my-command: |\n    echo hello",
     )
 
     for v in content.values():
         check(
             isinstance(v, str),
-            f"Expected rfile dictionary entries to be strings, but found {type(v)}",
+            f"Expected rfile '{file}' dictionary entries to be strings, but found {type(v)}",
         )
 
 
@@ -173,7 +175,7 @@ def locate_rfile(help: bool, completing: bool) -> str:
     """.rstrip()
     )
     msg = color(
-        "File 'rfile' not found in this directory or parents! Make one! Here is an example:",
+        "No rfile.yml not found in this directory or parents, and --rfile was not used to specify it manually. Here is an example rfile:",
         Colors.RED,
     )
     if completing:
@@ -322,8 +324,9 @@ def cli():
     internal_assert(rfile.exists(), "check rfile exists")
 
     with open(rfile) as f:
-        content = yaml.safe_load(f)
-    check_rfile(content)
+        string_content = f.read()
+        content = yaml.safe_load(string_content)
+    check_rfile(content=content, file=rfile, string_content=string_content)
 
     # Generate the real args
     parser = argparse.ArgumentParser(add_help=False)
