@@ -7,6 +7,7 @@ import re
 import json
 import logging
 import sys
+import time
 
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
@@ -92,11 +93,19 @@ class Handler(watchdog.events.FileSystemEventHandler):
         self.procs = procs
         self.params = params
 
-        worker_thread = threading.Thread(target=worker, args=(self.loop,))
-        worker_thread.start()
+        self.worker_thread = threading.Thread(target=worker, args=(self.loop,))
+        self.worker_thread.start()
+
+        # If another delay handler comes in for the same source file within
+        # this many MS of a previous one, it will be ignored
+        self.debounce_duration_ms = 200
+
+        # A mapping of each file to the last time an event handler was run for
+        # that file
+        self.debounce_timings: Dict[str, int] = {}
 
     def on_any_event(self, event):
-        if event is not None and event.event_type in {"closed"}:
+        if event is not None and event.event_type in {"closed", "opened"}:
             # Ignored events
             return
 
@@ -104,6 +113,21 @@ class Handler(watchdog.events.FileSystemEventHandler):
             # Not sure why these get triggered, but ignore events to files that
             # aren't in the list
             return
+
+        # Check if the event should be ignored due to debouncing
+        event_time_ms = round(time.time() * 1000)
+        debounce_entry = self.debounce_timings.get(event.src_path)
+        # print("----")
+        if debounce_entry is not None:
+            time_since_last_event = abs(event_time_ms - debounce_entry)
+            # print("DEBOUNCING", time_since_last_event)
+            if time_since_last_event < self.debounce_duration_ms:
+                return
+
+        self.debounce_timings[event.src_path] = event_time_ms
+        # print(self.debounce_timings)
+        # print(self.debounce_timings)
+        # print("----")
 
         # On a file change event, run the relevant script
         if self.params.cancel_watch:
