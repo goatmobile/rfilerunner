@@ -45,7 +45,7 @@ def check_rfile(content: Any, string_content: str, file: str):
 def show_help(missing_file: bool, commands, error=None):
     preamble = textwrap.dedent(
         f"""
-    {color('usage', Colors.YELLOW)}: r [-h, --help] [-v, --verbose] [-r, --rfile rfile] {color('COMMAND', Colors.CYAN)}
+    {color('usage', Colors.YELLOW)}: r [-h, --help] [-d, --dump] [-v, --verbose] [-r, --rfile rfile] {color('COMMAND', Colors.CYAN)}
 
     rfile is a simple command runner for executing Python and shell scripts
     """
@@ -278,6 +278,7 @@ def cli():
     parser.add_argument("-r", "--rfile")
     parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-d", "--dump", action="store_true")
     parser.add_argument(
         "--completions",
         action="store_true",
@@ -327,6 +328,8 @@ def cli():
         string_content = f.read()
         content = yaml.safe_load(string_content)
     check_rfile(content=content, file=rfile, string_content=string_content)
+
+    rfile_args = args
 
     # Generate the real args
     parser = argparse.ArgumentParser(add_help=False)
@@ -396,6 +399,10 @@ def cli():
                 )
             )
             command = candidates[0]
+
+    if rfile_args.dump:
+        print(content[command].strip())
+        exit(0)
 
     inner_parser = argparse.ArgumentParser(add_help=False)
     params = commands[command]
@@ -469,7 +476,6 @@ def cli():
 
         watch_files = [x.strip() for x in subparser_args.watch.split(",")]
 
-    # exit(0)
     code, stdout = asyncio.run(
         run(
             params,
