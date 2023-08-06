@@ -107,7 +107,6 @@ class Handler(watchdog.events.FileSystemEventHandler):
 
         # On a file change event, run the relevant script
         if self.params.cancel_watch:
-
             # Terminate any async processes in the worker thread's loop
             if self.last_handle is not None:
                 self.last_handle.cancel()

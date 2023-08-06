@@ -42,6 +42,15 @@ def check_rfile(content: Any, string_content: str, file: str):
         )
 
 
+def are_completions_installed(shell: str) -> bool:
+    if shell == "fish":
+        return get_fish_completions_file().exists()
+    else:
+        # Shell is unknown for determining where completions live, so just skip
+        # this
+        return True
+
+
 def show_help(missing_file: bool, commands, error=None):
     preamble = textwrap.dedent(
         f"""
@@ -50,6 +59,17 @@ def show_help(missing_file: bool, commands, error=None):
     rfile is a simple command runner for executing Python and shell scripts
     """
     ).strip()
+
+    shell = get_shell()
+    if not are_completions_installed(shell=shell.name):
+        preamble = (
+            color(
+                f"[note] shell completions for {shell.name} are not installed, add them with 'r --completions'",
+                Colors.LIGHT_BLUE,
+            )
+            + "\n"
+            + preamble
+        )
 
     if missing_file:
         print(
@@ -184,12 +204,20 @@ def locate_rfile(help: bool, completing: bool) -> str:
         error(msg + sample)
 
 
-def handle_shell_completions(prev, options):
+def get_shell() -> Path:
     shell = os.getenv("SHELL", None)
     if shell is None:
         print("Didn't find anything in SHELL environment variable, exiting")
-        exit(0)
-    shell = Path(shell)
+        exit(1)
+    return Path(shell)
+
+
+def get_fish_completions_file() -> Path:
+    return Path(os.path.expanduser("~")) / ".config" / "fish" / "completions" / "r.fish"
+
+
+def handle_shell_completions(prev, options):
+    shell = get_shell()
 
     if prev is not None:
         prev = prev.split()
@@ -227,10 +255,8 @@ def handle_shell_completions(prev, options):
             and sys.stdout.isatty()
             and not os.getenv("DEBUG", "") == "1"
         ):
-            completions_dir = (
-                Path(os.path.expanduser("~")) / ".config" / "fish" / "completions"
-            )
-            out = completions_dir / "r.fish"
+            out = get_fish_completions_file()
+            completions_dir = out.parent
 
             print(f"Install completions for fish shell in {out}?\n(y/n) ", end="")
             response = input().lower()
